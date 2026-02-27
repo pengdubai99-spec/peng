@@ -36,7 +36,7 @@ import { io, Socket } from "socket.io-client";
 import LiveTracking from "../../components/LiveTracking";
 
 // Tracking Service URL
-const TRACKING_URL = "http://localhost:3003";
+const TRACKING_URL = "http://localhost:3005";
 
 export default function DashboardPage() {
   const router = useRouter();

@@ -30,8 +30,8 @@ const STUN_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
-const DEFAULT_SERVER = '192.168.1.100';
-const DEFAULT_PORT = '3003';
+const DEFAULT_SERVER = '192.168.1.60';
+const DEFAULT_PORT = '3005';
 
 // ── Types ───────────────────────────────────────────────────
 interface LogEntry {
@@ -422,7 +422,7 @@ export default function App() {
               style={styles.input}
               value={serverPort}
               onChangeText={setServerPort}
-              placeholder="3003"
+              placeholder="3005"
               placeholderTextColor="#666"
               keyboardType="numeric"
             />

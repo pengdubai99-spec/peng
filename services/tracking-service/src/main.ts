@@ -9,7 +9,7 @@ async function bootstrap() {
   // Serve static files (viewer.html etc.)
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
-  const port = process.env.PORT || 3003;
+  const port = process.env.PORT || 3005;
   await app.listen(port, '0.0.0.0');
   
   console.log(`📍 Tracking Service (WS) running on http://0.0.0.0:${port}`);

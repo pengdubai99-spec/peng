@@ -26,7 +26,7 @@ const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { 
 const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
 
 // Tracking Service URL
-const TRACKING_URL = "http://localhost:3003";
+const TRACKING_URL = "http://localhost:3005";
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
