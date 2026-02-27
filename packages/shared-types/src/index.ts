@@ -24,4 +24,7 @@ export {
   type VideoRecording,
   type ApiResponse,
   type PaginatedResponse,
+  type WebRTCOffer,
+  type WebRTCAnswer,
+  type WebRTCIceCandidate,
 } from './location';

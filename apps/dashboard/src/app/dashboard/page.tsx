@@ -1,5 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import "leaflet/dist/leaflet.css";
+import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css";
+import "leaflet-defaulticon-compatibility";
+
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   LayoutDashboard, 
@@ -18,23 +23,69 @@ import {
   ShieldAlert,
   History,
   Wrench,
-  Users
+  Users,
+  X,
+  AlertTriangle,
+  Cpu,
+  Zap,
+  ShieldCheck
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { io, Socket } from "socket.io-client";
+import LiveTracking from "../../components/LiveTracking";
+
+// Tracking Service URL
+const TRACKING_URL = "http://localhost:3003";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [lang, setLang] = useState('en');
   const [activeTab, setActiveTab] = useState(0);
+  const [alert, setAlert] = useState<any>(null);
+  const [selectedTrip, setSelectedTrip] = useState<any>(null);
   const isRtl = lang === 'ar';
+
+  const [vehicles, setVehicles] = useState<Record<string, any>>({});
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     }
+
+    // Initialize Socket
+    socketRef.current = io(TRACKING_URL, {
+      transports: ["websocket"],
+    });
+
+    socketRef.current.on("connect", () => {
+      console.log("Dashboard connected to Tracking Service");
+      // Subscribe to all updates
+      socketRef.current?.emit("location:subscribe", { fleetId: "global" });
+    });
+
+    socketRef.current.on("location:data", (data: any) => {
+      setVehicles(prev => ({
+        ...prev,
+        [data.vehicleId]: {
+          ...data,
+          lastUpdate: new Date().getTime()
+        }
+      }));
+    });
+
+    socketRef.current.on("ai:alert", (data: any) => {
+      setAlert(data);
+      // Auto-clear alert after 8 seconds
+      setTimeout(() => setAlert(null), 8000);
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+    };
   }, []);
 
   const handleLogout = () => {
@@ -49,7 +100,20 @@ export default function DashboardPage() {
     { id: 2, icon: MapIcon, label: lang === 'tr' ? "Canli Takip" : (lang === 'ar' ? "تتبع مباشر" : "Live Tracking") },
     { id: 3, icon: Clock, label: lang === 'tr' ? "Gecmis" : (lang === 'ar' ? "السجل" : "History") },
     { id: 4, icon: Settings, label: lang === 'tr' ? "Ayarlar" : (lang === 'ar' ? "الإعدادات" : "Settings") },
+    { id: 5, icon: ShieldAlert, label: lang === 'tr' ? "Yonetim" : (lang === 'ar' ? "لوحة التحكم" : "Admin"), path: '/admin' },
   ];
+
+  const handleMenuClick = (item: any) => {
+    if (item.path) {
+      router.push(item.path);
+    } else {
+      setActiveTab(item.id);
+    }
+  };
+
+  const filteredMenuItems = user?.role === 'FLEET_MANAGER' 
+    ? menuItems.filter(i => i.id !== 5) 
+    : menuItems;
 
   return (
     <div className={`flex min-h-screen bg-[#050510] text-[#f0f0ff] font-['Outfit'] ${isRtl ? 'font-["IBM_Plex_Sans_Arabic"] flex-row-reverse' : ''}`} dir={isRtl ? 'rtl' : 'ltr'}>
@@ -63,16 +127,19 @@ export default function DashboardPage() {
       <aside className={`w-64 border-x border-white/[0.05] bg-white/[0.02] backdrop-blur-xl flex flex-col relative z-20 ${isRtl ? 'border-l' : 'border-r'}`}>
         <div className="p-6 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-            <Navigation className="w-4 h-4 text-white" />
+            {user?.role === 'FLEET_MANAGER' ? <Car className="w-4 h-4 text-white" /> : <Navigation className="w-4 h-4 text-white" />}
           </div>
-          <span className="text-xl font-bold tracking-tight gradient-text-peng">PENG</span>
+          <div className="flex flex-col">
+            <span className="text-xl font-bold tracking-tight gradient-text-peng">PENG</span>
+            {user?.role === 'FLEET_MANAGER' && <span className="text-[8px] font-black tracking-widest text-slate-500 uppercase -mt-1">Partner Portal</span>}
+          </div>
         </div>
 
         <nav className="flex-1 px-4 py-4 space-y-2">
-          {menuItems.map((item) => (
+          {filteredMenuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => handleMenuClick(item)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                 activeTab === item.id 
                   ? "bg-white/[0.08] text-white shadow-lg shadow-indigo-500/5" 
@@ -91,7 +158,24 @@ export default function DashboardPage() {
           ))}
         </nav>
 
-        <div className="p-4 mt-auto border-t border-white/[0.05]">
+        <div className="p-4 mt-auto space-y-4">
+          {/* Pro Status Card */}
+          <div className="glass-card p-4 rounded-2xl border border-indigo-500/10 bg-indigo-500/[0.02] relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 w-16 h-16 bg-indigo-500/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-1000" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-3 h-3 text-indigo-400 fill-indigo-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">SAFERIDE PRO</span>
+              </div>
+              <p className="text-[9px] text-slate-400 leading-relaxed mb-3">AI Vision & Cloud Storage active for your fleet.</p>
+              <button className="w-full py-1.5 bg-indigo-500 hover:bg-indigo-400 text-white text-[9px] font-black uppercase tracking-tighter rounded-lg transition-colors">
+                UPGRADE PLAN
+              </button>
+            </div>
+          </div>
+
+          <div className="h-[1px] bg-white/[0.05]" />
+          
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all group"
@@ -101,6 +185,70 @@ export default function DashboardPage() {
           </button>
         </div>
       </aside>
+
+      {/* Global AI Alert Overlay */}
+      <AnimatePresence>
+        {alert && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 100 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 100 }}
+            className={`fixed bottom-8 ${isRtl ? 'left-8' : 'right-8'} z-[100] w-[400px] glass-card overflow-hidden border-l-4 border-red-500 shadow-2xl bg-black/80 backdrop-blur-2xl`}
+          >
+            <div className="p-5">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center animate-pulse">
+                    <ShieldAlert className="w-6 h-6 text-red-500" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-widest text-red-500">
+                      {lang === 'tr' ? 'ACIL DURUM ALARMI' : (lang === 'ar' ? 'تنبيه طوارئ' : 'EMERGENCY ALERT')}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">{alert.vehicleId} • {alert.timestamp}</p>
+                  </div>
+                </div>
+                <button onClick={() => setAlert(null)} className="p-1 hover:bg-white/5 rounded-lg">
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                 <div className="p-3 bg-red-500/5 rounded-xl border border-red-500/10">
+                    <p className="text-xl font-bold text-white mb-1">
+                      {alert.type === 'FATIGUE' ? (lang === 'tr' ? 'Sürücü Yorgunluğu' : 'Driver Fatigue Detected') : 
+                       alert.type === 'DISTRACTION' ? (lang === 'tr' ? 'Dikkat Dağınıklığı' : 'Distraction Detected') : alert.label}
+                    </p>
+                    <p className="text-xs text-slate-400 lowercase">
+                      {lang === 'tr' ? 'Sürücü uykulu veya dikkati dağınık görünüyor. Hemen müdahale edin.' : 
+                       'Driver appears drowsy or distracted. Immediate intervention required.'}
+                    </p>
+                 </div>
+                 
+                 <div className="flex gap-2">
+                   <button 
+                     onClick={() => { setActiveTab(2); setAlert(null); }}
+                     className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                   >
+                     {lang === 'tr' ? 'CANLI İZLE' : 'VIEW LIVE'}
+                   </button>
+                   <button className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl text-xs font-black uppercase tracking-widest transition-all">
+                     {lang === 'tr' ? 'ARA' : 'CALL'}
+                   </button>
+                 </div>
+              </div>
+            </div>
+            
+            {/* Progress Bar for Auto-dismiss */}
+            <motion.div 
+              initial={{ width: "100%" }}
+              animate={{ width: "0%" }}
+              transition={{ duration: 8, ease: "linear" }}
+              className="h-1 bg-red-500/50" 
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col relative z-10 min-w-0">
@@ -166,10 +314,14 @@ export default function DashboardPage() {
                 <div className="flex items-end justify-between">
                   <div>
                     <h1 className="text-3xl font-bold text-white mb-2">
-                      {lang === 'ar' ? `أهلاً بك، ${user?.name || "المدير"}` : (lang === 'tr' ? `Hos geldin, ${user?.name || "Admin"}` : `Welcome back, ${user?.name || "Admin"}`)} 👋
+                      {user?.role === 'FLEET_MANAGER' 
+                        ? (lang === 'tr' ? `Hos geldin, ${user?.name}` : `Welcome, ${user?.name}`)
+                        : (lang === 'ar' ? `أهلاً بك، ${user?.name || "المدير"}` : (lang === 'tr' ? `Hos geldin, ${user?.name || "Admin"}` : `Welcome back, ${user?.name || "Admin"}`))} 👋
                     </h1>
                     <p className="text-slate-400 text-sm">
-                      {lang === 'ar' ? 'يوجد حالياً ١٢ مركبة نشطة في سماء دبي.' : (lang === 'tr' ? 'Seyh Zayed Yolunda 12 arac aktif.' : '12 vehicles active near Sheikh Zayed Road.')}
+                      {user?.role === 'FLEET_MANAGER' 
+                        ? (lang === 'tr' ? `${user?.name} filosunun guncel durumunu izleyin.` : `Monitoring your fleet: ${user?.name}.`)
+                        : (lang === 'ar' ? 'يوجد حالياً ١٢ مركبة نشطة في سماء دبي.' : (lang === 'tr' ? 'Seyh Zayed Yolunda 12 arac aktif.' : '12 vehicles active near Sheikh Zayed Road.'))}
                     </p>
                   </div>
                   <button className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-indigo-600/20 active:scale-95">
@@ -181,20 +333,47 @@ export default function DashboardPage() {
                 {/* Stat Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   {[
-                    { label: lang === 'ar' ? "المركبات النشطة" : "Active Vehicles", value: "12", sub: "+2 vs last hour" },
-                    { label: lang === 'ar' ? "إجمالي الدخل" : "Total Revenue", value: "AED 42,500", sub: "%15 increase" },
-                    { label: lang === 'ar' ? "متوسط السرعة" : "Avg speed", value: "75 km/h", sub: "Dubai Limits" },
-                    { label: lang === 'ar' ? "تنبيهات نشطة" : "Active Alerts", value: "3", sub: "Near Downtown" },
-                  ].map((stat) => (
+                    { label: lang === 'ar' ? "المركبات النشطة" : (lang === 'tr' ? "Aktif Araclar" : "Active Vehicles"), value: "12", sub: "+2 vs last hour", icon: Car, color: "indigo" },
+                    { label: lang === 'ar' ? "إجمالي الدخل" : (lang === 'tr' ? "Toplam Gelir" : "Total Revenue"), value: "AED 42.5k", sub: "%15 increase", icon: DollarSign, color: "emerald" },
+                    { label: lang === 'ar' ? "الذكاء الاصطناعي" : (lang === 'tr' ? "AI Analizi" : "AI Security"), value: "99.2%", sub: "Dubai SafeCity", icon: ShieldCheck, color: "purple" },
+                    { label: lang === 'ar' ? "تنبيهات نشطة" : (lang === 'tr' ? "Aktif Uyari" : "Active Alerts"), value: "3", sub: "Near Downtown", icon: Bell, color: "red" },
+                  ].map((stat, i) => (
                     <motion.div 
                       key={stat.label}
-                      whileHover={{ y: -4 }}
-                      className="glass-card p-6 rounded-2xl relative overflow-hidden group border border-white/[0.03]"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.1 }}
+                      whileHover={{ y: -4, backgroundColor: "rgba(255,255,255,0.03)" }}
+                      className="glass-card p-6 rounded-2xl relative overflow-hidden group border border-white/[0.03] transition-colors"
                     >
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/[0.03] rounded-full translate-x-8 translate-y-[-8px] group-hover:scale-150 transition-all duration-500" />
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">{stat.label}</p>
-                      <h3 className="text-3xl font-bold text-white mb-1">{stat.value}</h3>
-                      <p className="text-xs text-slate-400">{stat.sub}</p>
+                      <div className={`absolute top-0 right-0 w-32 h-32 bg-${stat.color}-500/[0.03] rounded-full translate-x-12 translate-y-[-12px] group-hover:scale-150 transition-all duration-700`} />
+                      
+                      <div className="flex justify-between items-start relative z-10 mb-4">
+                        <div className={`p-2.5 rounded-xl bg-${stat.color}-500/10 border border-${stat.color}-500/20`}>
+                          <stat.icon className={`w-5 h-5 text-${stat.color}-400`} />
+                        </div>
+                        {/* Mini Sparkline Simulation */}
+                        <div className="flex items-end gap-1 h-8">
+                          {[40, 70, 45, 90, 65, 80].map((h, i) => (
+                            <motion.div 
+                              key={i}
+                              initial={{ height: 0 }}
+                              animate={{ height: `${h}%` }}
+                              transition={{ delay: 0.5 + i * 0.1, duration: 1 }}
+                              className={`w-1 rounded-full bg-${stat.color}-500/30`} 
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="relative z-10">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">{stat.label}</p>
+                        <h3 className="text-3xl font-bold text-white mb-1 flex items-baseline gap-2">
+                          {stat.value}
+                          {stat.color === 'emerald' && <span className="text-xs text-emerald-400 font-medium">↑</span>}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 font-medium">{stat.sub}</p>
+                      </div>
                     </motion.div>
                   ))}
                 </div>
@@ -202,29 +381,45 @@ export default function DashboardPage() {
                 {/* Map & List Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-2 glass-card rounded-3xl overflow-hidden h-[400px] relative border border-white/[0.03]">
-                    <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center opacity-40">
-                      <MapIcon className="w-12 h-12 text-slate-700 mb-4" />
-                      <p className="text-slate-600 text-sm font-medium italic">{lang === 'ar' ? 'تحميل خريطة دبي...' : 'Loading Dubai Map...'}</p>
-                    </div>
-                    <div className={`absolute top-4 ${isRtl ? 'right-4' : 'left-4'} p-4 bg-[#050510]/80 backdrop-blur-md rounded-2xl border border-white/[0.05] z-10 w-64`}>
-                      <p className="text-xs font-bold text-white mb-3 uppercase tracking-wider">{lang === 'ar' ? 'مواقع الأسطول النشط' : 'Active Fleet Locations'}</p>
-                      <div className="space-y-4">
-                        {["Downtown", "Marina", "Business Bay"].map(loc => (
-                          <div key={loc} className="flex items-center gap-3">
-                            <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1] animate-pulse" />
-                            <div className="flex-1">
-                              <p className="text-[10px] text-slate-400 mb-1 font-bold">{loc}</p>
-                              <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-                                <motion.div 
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${Math.random() * 100}%` }}
-                                  transition={{ duration: 1, delay: 0.5 }}
-                                  className="h-full bg-indigo-500" 
-                                />
-                              </div>
+                    <OverviewMap vehicles={vehicles} />
+                    
+                    {/* Top Regions - High Tech UI */}
+                    <div className={`absolute top-4 ${isRtl ? 'right-4' : 'left-4'} p-5 bg-[#050510]/95 backdrop-blur-2xl rounded-[2rem] border border-white/[0.08] z-10 w-72 shadow-2xl`}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]" />
+                        <p className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{lang === 'ar' ? 'تغطية الأسطول' : 'Fleet Coverage'}</p>
+                      </div>
+                      
+                      <div className="space-y-5">
+                        {[
+                          { name: "Downtown", val: 85, color: "indigo" },
+                          { name: "Dubai Marina", val: 62, color: "indigo" },
+                          { name: "Business Bay", val: 40, color: "indigo" }
+                        ].map(loc => (
+                          <div key={loc.name}>
+                            <div className="flex justify-between items-center mb-1.5">
+                              <span className="text-[10px] font-bold text-slate-400">{loc.name}</span>
+                              <span className="text-[10px] font-mono text-indigo-400">{loc.val}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden p-[0.5px]">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${loc.val}%` }}
+                                transition={{ duration: 1.5, ease: "circOut" }}
+                                className="h-full bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.3)]" 
+                              />
                             </div>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+                         <div className="flex -space-x-2">
+                            {[1,2,3].map(i => (
+                              <div key={i} className="w-5 h-5 rounded-full border border-[#050510] bg-slate-800 flex items-center justify-center text-[8px] font-bold text-slate-400">?</div>
+                            ))}
+                         </div>
+                         <p className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">+12 DRIVERS IN DUBAI</p>
                       </div>
                     </div>
                   </div>
@@ -237,21 +432,20 @@ export default function DashboardPage() {
                     <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scroll">
                       {[
                         { title: "DXB 5521", desc: lang === 'ar' ? "بدأت رحلة جديدة من المطار" : "New trip started from Airport", time: "Just now", color: "indigo" },
-                        { title: lang === 'ar' ? "أحمد م." : "Ahmed M.", desc: lang === 'ar' ? "تسجيل دخول" : "Logged in", time: "5m", color: "purple" },
+                        { title: lang === 'ar' ? "أحمد م." : "Ahmed M.", desc: lang === 'ar' ? "تسجيل دخول" : "Logged in", time: "5m", color: "indigo" },
                         { title: "DIFC Unit", desc: lang === 'ar' ? "تنبيه سرعة زائدة" : "Speed alert detected", time: "12m", urgent: true },
-                        { title: "DXB 9982", desc: lang === 'ar' ? "رحلة منتهية" : "Trip completed at Marina", time: "18m", color: "emerald" },
-                        { title: "Jumeirah Unit", desc: lang === 'ar' ? "منطقة محدودة" : "Restricted zone entry", time: "25m", urgent: true },
+                        { title: "DXB 9982", desc: lang === 'ar' ? "رحلة منteية" : "Trip completed at Marina", time: "18m", color: "emerald" },
                       ].map((act, i) => (
-                        <div key={i} className="flex gap-4 group">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${act.urgent ? 'bg-red-500/10 border border-red-500/20' : 'bg-white/[0.05] border border-white/[0.08]'}`}>
-                            {act.urgent ? <Bell className="w-4 h-4 text-red-500" /> : <Activity className="w-4 h-4 text-indigo-500" />}
+                        <div key={i} className="flex gap-4 group cursor-pointer p-2 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/[0.03]">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all group-hover:rotate-6 ${act.urgent ? 'bg-red-500/10 border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]' : 'bg-white/[0.05] border border-white/[0.08]'}`}>
+                            {act.urgent ? <ShieldAlert className="w-4 h-4 text-red-500" /> : <Activity className="w-4 h-4 text-indigo-500" />}
                           </div>
-                          <div className={`flex-1 border-b border-white/[0.05] pb-4 group-last:border-0`}>
-                            <div className="flex justify-between items-start mb-1">
-                              <p className={`text-sm font-bold transition-colors ${act.urgent ? 'text-red-400 group-hover:text-red-300' : 'text-white group-hover:text-indigo-300'}`}>{act.title}</p>
-                              <span className="text-[10px] text-slate-500 font-medium">{act.time}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start mb-0.5">
+                              <p className={`text-xs font-black truncate transition-colors ${act.urgent ? 'text-red-400' : 'text-white'}`}>{act.title}</p>
+                              <span className="text-[9px] text-slate-500 font-mono">{act.time}</span>
                             </div>
-                            <p className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">{act.desc}</p>
+                            <p className="text-[10px] text-slate-500 line-clamp-1 group-hover:text-slate-400 transition-colors uppercase font-bold tracking-tighter">{act.desc}</p>
                           </div>
                         </div>
                       ))}
@@ -321,64 +515,117 @@ export default function DashboardPage() {
             {activeTab === 2 && (
               <motion.div 
                 key="tab2"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.02 }}
-                className="h-full flex flex-col space-y-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-full"
               >
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold text-white">{lang === 'ar' ? 'التتبع المباشر' : (lang === 'tr' ? 'Canli Takip' : 'Live Tracking')}</h2>
-                  <div className="flex gap-2">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      12 ONLINE
-                    </div>
-                  </div>
-                </div>
-                <div className="flex-1 glass-card rounded-3xl border border-white/[0.03] overflow-hidden relative min-h-[500px]">
-                  <div className="absolute inset-0 bg-slate-900/50 flex flex-col items-center justify-center">
-                    <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4" />
-                    <p className="text-slate-500 font-bold tracking-widest uppercase">Initializing Radar System...</p>
-                  </div>
-                </div>
+                <LiveTracking lang={lang} />
               </motion.div>
             )}
+
 
             {activeTab === 3 && (
               <motion.div 
                 key="tab3"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="space-y-6"
+                className="space-y-6 flex flex-col h-full"
               >
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold text-white">{lang === 'ar' ? 'سجل الرحلات' : (lang === 'tr' ? 'Yolculuk Gecmisi' : 'Trip History')}</h2>
+                  {selectedTrip && (
+                    <button 
+                      onClick={() => setSelectedTrip(null)}
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-400 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      {lang === 'tr' ? 'Listeye Don' : 'Back to List'}
+                    </button>
+                  )}
                 </div>
-                <div className="glass-card rounded-2xl border border-white/[0.03] overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-white/[0.02] border-b border-white/[0.05]">
-                      <tr>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{lang === 'ar' ? 'المركبة' : 'Vehicle'}</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{lang === 'ar' ? 'السائق' : 'Driver'}</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{lang === 'ar' ? 'الوجهة' : 'To'}</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">{lang === 'ar' ? 'التكلفة' : 'Cost'}</th>
-                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.03]">
-                      {[1, 2, 3, 4, 5].map(i => (
-                        <tr key={i} className="hover:bg-white/[0.01] transition-colors group">
-                          <td className="px-6 py-4 text-sm font-bold text-white">DXB {1000 + i * 23}</td>
-                          <td className="px-6 py-4 text-sm text-slate-400">Driver {i}</td>
-                          <td className="px-6 py-4 text-sm text-slate-400">Dubai Mall</td>
-                          <td className="px-6 py-4 text-sm font-bold text-indigo-400">AED {40 + i * 15}.00</td>
-                          <td className="px-6 py-4 text-right">
-                             <button className="p-2 rounded-lg bg-white/[0.05] opacity-0 group-hover:opacity-100 transition-all"><ChevronRight className="w-4 h-4" /></button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                <div className="flex-1 min-h-0">
+                  <AnimatePresence mode="wait">
+                    {!selectedTrip ? (
+                      <motion.div 
+                        key="list"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="glass-card rounded-[2rem] border border-white/[0.03] overflow-hidden shadow-2xl"
+                      >
+                        <table className="w-full text-left">
+                          <thead className="bg-[#0c0c1e] border-b border-white/[0.05]">
+                            <tr>
+                              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{lang === 'ar' ? 'المركبة' : 'Vehicle'}</th>
+                              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{lang === 'ar' ? 'السائق' : 'Driver'}</th>
+                              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{lang === 'ar' ? 'الوجهة' : 'To'}</th>
+                              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{lang === 'ar' ? 'التكلفة' : 'Cost'}</th>
+                              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/[0.03]">
+                            {[1, 2, 3, 4, 5].map(i => (
+                              <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
+                                <td className="px-8 py-6 text-sm font-black text-white uppercase tracking-tighter">DXB {1000 + i * 23}</td>
+                                <td className="px-8 py-6 text-sm text-slate-400 font-medium">Driver {i}</td>
+                                <td className="px-8 py-6 text-sm text-slate-400 font-medium">Dubai Mall / Marina</td>
+                                <td className="px-8 py-6 text-sm font-black text-emerald-400 font-mono">AED {40 + i * 15}.00</td>
+                                <td className="px-8 py-6 text-right">
+                                   <button 
+                                     onClick={() => setSelectedTrip({ id: i, route: [[25.2048, 55.2708], [25.0717, 55.1389]] })}
+                                     className="px-3 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all"
+                                   >
+                                     View Route
+                                   </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        key="map"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        className="h-[500px] glass-card rounded-[2rem] overflow-hidden border border-white/[0.08] relative shadow-2xl shadow-indigo-500/10"
+                      >
+                         <HistoryMap route={selectedTrip.route} />
+                         
+                         <div className="absolute bottom-6 left-6 p-6 bg-[#050510]/90 backdrop-blur-2xl rounded-2xl border border-white/10 z-10 w-80">
+                            <h4 className="text-white font-black uppercase text-xs tracking-widest mb-4">Route Replay</h4>
+                            <div className="space-y-4">
+                               <div className="flex items-center gap-3">
+                                  <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">START: Dubai International Airport</p>
+                               </div>
+                               <div className="flex items-center gap-3">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">END: Dubai Marina District</p>
+                               </div>
+                               
+                               <div className="pt-4 border-t border-white/5 space-y-3">
+                                  <div className="flex justify-between text-[10px] font-black uppercase">
+                                     <span className="text-slate-500">Distance</span>
+                                     <span className="text-white">32.4 KM</span>
+                                  </div>
+                                  <div className="flex justify-between text-[10px] font-black uppercase">
+                                     <span className="text-slate-500">Safety Score</span>
+                                     <span className="text-emerald-400">98/100</span>
+                                  </div>
+                               </div>
+                               
+                               <button className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all">
+                                  Play Animation
+                               </button>
+                            </div>
+                         </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             )}
@@ -412,6 +659,74 @@ export default function DashboardPage() {
           </AnimatePresence>
         </div>
       </main>
+    </div>
+  );
+}
+
+// Map component with Dynamic SSR handling
+const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
+const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
+const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
+const Polyline = dynamic(() => import('react-leaflet').then(mod => mod.Polyline), { ssr: false });
+const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
+
+function OverviewMap({ vehicles }: { vehicles: Record<string, any> }) {
+  // Dubai Default
+  const position: [number, number] = [25.2048, 55.2708];
+
+  return (
+    <div className="absolute inset-0 z-0">
+      <MapContainer 
+        center={position} 
+        zoom={12} 
+        style={{ height: '100%', width: '100%', filter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)' }}
+        zoomControl={false}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+        {Object.values(vehicles).map((v: any) => (
+          v.position && (
+            <Marker 
+              key={v.vehicleId} 
+              position={[v.position.lat, v.position.lng]}
+            />
+          )
+        ))}
+      </MapContainer>
+    </div>
+  );
+}
+
+function HistoryMap({ route }: { route: [number, number][] }) {
+  const center: [number, number] = route[0];
+
+  return (
+    <div className="h-full w-full">
+      <MapContainer 
+        center={center} 
+        zoom={11} 
+        style={{ height: '100%', width: '100%', filter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)' }}
+        zoomControl={false}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <Polyline 
+          positions={route} 
+          color="#6366f1" 
+          weight={4} 
+          opacity={0.8}
+          dashArray="10, 10"
+        />
+        <Marker position={route[0]}>
+           <Popup>Start Point</Popup>
+        </Marker>
+        <Marker position={route[route.length - 1]}>
+           <Popup>End Point</Popup>
+        </Marker>
+      </MapContainer>
     </div>
   );
 }

@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "CanTak",
+    "slug": "cantak",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050510"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CanTak arac ici guvenlik kamerasi icin erisim gerektirir."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "CanTak surus sirasinda konum takibi icin erisim gerektirir.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      "./plugins/withWebRTC"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.cantak.driver",
+      "newArchEnabled": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "CanTak arac ici guvenlik kamerasi icin erisim gerektirir.",
+        "NSMicrophoneUsageDescription": "CanTak ses kaydi icin mikrofona erisim gerektirir.",
+        "NSLocationWhenInUseUsageDescription": "CanTak surus sirasinda konum takibi yapar.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "CanTak arka planda konum takibi yapar.",
+        "UIBackgroundModes": [
+          "location",
+          "voip"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.cantak.driver",
+      "newArchEnabled": false,
+      "adaptiveIcon": {
+        "backgroundColor": "#050510",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "owner": "peng999",
+    "extra": {
+      "eas": {
+        "projectId": "6578b446-9b0a-4f9e-bd2c-deae9ebf84f8"
+      }
+    }
+  }
+}

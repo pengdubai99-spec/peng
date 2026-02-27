@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loginMode, setLoginMode] = useState<'admin' | 'partner'>('admin');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,13 +86,29 @@ export default function LoginPage() {
               <span className="text-xl font-bold gradient-text-peng">PENG</span>
             </div>
 
+            {/* Mode Switcher */}
+            <div className="flex bg-white/[0.03] rounded-xl p-1 mb-8 border border-white/5">
+              <button 
+                onClick={() => setLoginMode('admin')}
+                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${loginMode === 'admin' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                Global Admin
+              </button>
+              <button 
+                onClick={() => setLoginMode('partner')}
+                className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${loginMode === 'partner' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+              >
+                Fleet Partner
+              </button>
+            </div>
+
             <h2 className="text-2xl font-bold text-white mb-2">
-              {isRegister ? "Hesap Olustur" : "Giris Yap"}
+              {isRegister ? (loginMode === 'partner' ? 'Partner Registration' : 'Account Setup') : (loginMode === 'partner' ? 'Partner Portal' : 'Admin Login')}
             </h2>
             <p className="text-sm text-slate-500 mb-8">
               {isRegister
-                ? "PENG platformuna katilmak icin bilgilerinizi girin."
-                : "Filo yonetim panelinize erisin."}
+                ? "Join the PENG network and manage your fleet efficiently."
+                : loginMode === 'partner' ? "Access your dedicated fleet monitoring tools." : "Secure access for system administrators."}
             </p>
 
             {/* Messages */}
@@ -202,12 +219,17 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  localStorage.setItem("user", JSON.stringify({ name: "Demo Kullanici", role: "Yonetici" }));
+                  const demoUser = loginMode === 'admin' 
+                    ? { name: "Global Admin", role: "ADMIN", id: "admin-1" }
+                    : { name: "Skyline Logistics", role: "FLEET_MANAGER", id: "partner-skyline", fleetId: "skyline-1" };
+                  
+                  localStorage.setItem("user", JSON.stringify(demoUser));
+                  localStorage.setItem("token", "demo-token");
                   router.push("/dashboard");
                 }}
-                className="w-full py-2 text-xs text-slate-500 hover:text-indigo-400 transition-all border border-white/5 rounded-lg mt-2"
+                className={`w-full py-2 text-xs font-bold uppercase tracking-tighter transition-all border border-white/5 rounded-xl mt-2 ${loginMode === 'partner' ? 'text-purple-400 hover:bg-purple-500/10' : 'text-indigo-400 hover:bg-indigo-500/10'}`}
               >
-                Demo Olarak Giris Yap (Hizli Test)
+                Access Demo {loginMode === 'admin' ? 'Dashboard' : 'Portal'}
               </button>
             </form>
 
