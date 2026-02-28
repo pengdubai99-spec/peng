@@ -543,26 +543,27 @@
     peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     peerConnection.ontrack = (event) => {
-      addLog('Video stream aliniyor!');
+      addLog('Medya kanali yakalandi: ' + event.track.kind);
       console.log('Track event:', event);
       
-      if (remoteVideo.srcObject !== event.streams[0]) {
-        remoteVideo.srcObject = event.streams[0];
-        addLog('Stream baglandi');
+      if (!remoteVideo.srcObject) {
+        remoteVideo.srcObject = new MediaStream();
+        addLog('Yeni medya akisi olusturuldu');
       }
+      
+      remoteVideo.srcObject.addTrack(event.track);
 
       remoteVideo.style.display = 'block';
       videoPlaceholder.style.display = 'none';
       liveBadge.style.display = 'flex';
 
-      // Enure video plays
+      // Ensure video plays
       remoteVideo.play().catch(e => {
         addLog('Oynatma hatasi: ' + e.message);
-        console.warn('Play error:', e);
       });
 
       remoteVideo.onloadedmetadata = () => {
-        addLog(`Codec/Cozunurluk: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
+        addLog(`Goruntu: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
         document.getElementById('resolutionInfo').textContent =
           `${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`;
       };
