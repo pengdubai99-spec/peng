@@ -217,9 +217,9 @@ export default function App() {
         audio: true,
         video: {
           facingMode: facing === 'front' ? 'user' : 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 15 },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          frameRate: { max: 15 },
         },
       });
       localStream.current = stream as MediaStream;

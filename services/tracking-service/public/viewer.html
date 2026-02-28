@@ -557,15 +557,31 @@
       videoPlaceholder.style.display = 'none';
       liveBadge.style.display = 'flex';
 
-      // Ensure video plays
-      remoteVideo.play().catch(e => {
-        addLog('Oynatma hatasi: ' + e.message);
-      });
+      // Ensure attributes for autoplay
+      remoteVideo.muted = true;
+      remoteVideo.setAttribute('playsinline', '');
+      remoteVideo.setAttribute('autoplay', '');
+
+      // Try to play immediately
+      const playPromise = remoteVideo.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          addLog('Video oynatiliyor');
+        }).catch(error => {
+          addLog('Oynatma baslatilamadi: ' + error.message);
+          // Show a click-to-play overlay if needed
+          console.warn('Autoplay prevented:', error);
+        });
+      }
 
       remoteVideo.onloadedmetadata = () => {
-        addLog(`Goruntu: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
+        addLog(`Yayin Ozellikleri: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
         document.getElementById('resolutionInfo').textContent =
           `${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`;
+      };
+
+      remoteVideo.onloadeddata = () => {
+        addLog('Gorsel veri akisi basladi');
       };
     };
 
