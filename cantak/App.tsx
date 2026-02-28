@@ -28,10 +28,25 @@ import {
 const STUN_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
-const DEFAULT_SERVER = '192.168.1.60';
-const DEFAULT_PORT = '3005';
+const DEFAULT_SERVER = 'saferide-tracking.onrender.com';
+const DEFAULT_PORT = '';
 
 // ── Types ───────────────────────────────────────────────────
 interface LogEntry {
@@ -97,14 +112,20 @@ export default function App() {
       socketRef.current.disconnect();
     }
 
-    const url = `http://${serverIP}:${serverPort}`;
+    // If server looks like a domain (contains dots but no port needed), use https
+    const isCloudServer = serverIP.includes('.') && !serverIP.match(/^\d+\.\d+\.\d+\.\d+$/);
+    const url = isCloudServer
+      ? `https://${serverIP}`
+      : `http://${serverIP}:${serverPort}`;
     log(`Sunucuya bağlanılıyor: ${url}`);
 
     const socket = io(url, {
       transports: ['websocket'],
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 20,
       reconnectionDelay: 2000,
+      timeout: 10000,
+      forceNew: true,
     });
 
     socket.on('connect', () => {
@@ -120,7 +141,8 @@ export default function App() {
     });
 
     socket.on('connect_error', (err) => {
-      log(`Bağlantı hatası: ${err.message}`, 'error');
+      log(`Hata: ${err.message} (${err.name})`, 'error');
+      console.log('Socket Error:', err);
     });
 
     // WebRTC signaling
@@ -145,7 +167,8 @@ export default function App() {
     });
 
     socketRef.current = socket;
-    setSettingsVisible(false);
+    // Don't close modal automatically, instead show logs
+    setShowLogs(true);
   }, [serverIP, serverPort, vehicleId, log]);
 
   // ── GPS Tracking ────────────────────────────────────────
@@ -223,7 +246,7 @@ export default function App() {
     });
 
     // ICE candidates
-    pc.onicecandidate = (event: any) => {
+    pc.addEventListener('icecandidate', (event: any) => {
       if (event.candidate) {
         socket.emit('webrtc:ice-candidate', {
           vehicleId,
@@ -231,11 +254,11 @@ export default function App() {
           candidate: event.candidate,
         });
       }
-    };
+    });
 
-    pc.oniceconnectionstatechange = () => {
+    pc.addEventListener('iceconnectionstatechange', () => {
       const state = (pc as any).iceConnectionState;
-      log(`ICE durumu: ${state}`);
+      log(`ICE: ${state}`);
       if (state === 'connected') {
         setViewers(prev => prev + 1);
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
@@ -243,7 +266,7 @@ export default function App() {
         peerConnections.current.delete(viewerId);
         pc.close();
       }
-    };
+    });
 
     // Create and send offer
     const offer = await pc.createOffer({});
@@ -412,7 +435,7 @@ export default function App() {
               style={styles.input}
               value={serverIP}
               onChangeText={setServerIP}
-              placeholder="192.168.1.100"
+              placeholder="saferide-tracking.onrender.com"
               placeholderTextColor="#666"
               keyboardType="numeric"
             />
@@ -440,13 +463,39 @@ export default function App() {
               <Text style={styles.btnConnectText}>Bağlan</Text>
             </TouchableOpacity>
 
-            {connected && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
               <TouchableOpacity
-                style={styles.btnClose}
+                style={[styles.btnLog, { flex: 1, marginRight: 8 }]}
+                onPress={() => setShowLogs(!showLogs)}
+              >
+                <Text style={styles.btnLogText}>{showLogs ? 'Log Kapat' : 'Log Göster'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.btnClose, { flex: 1, marginTop: 0 }]}
                 onPress={() => setSettingsVisible(false)}
               >
                 <Text style={styles.btnCloseText}>Kapat</Text>
               </TouchableOpacity>
+            </View>
+
+            {showLogs && (
+              <View style={[styles.logPanel, { margin: 0, marginTop: 16, maxHeight: 150 }]}>
+                <ScrollView style={styles.logScroll}>
+                  {logs.map((l, i) => (
+                    <Text
+                      key={i}
+                      style={[
+                        styles.logText,
+                        l.type === 'error' && styles.logError,
+                        l.type === 'success' && styles.logSuccess,
+                      ]}
+                    >
+                      [{l.time}] {l.msg}
+                    </Text>
+                  ))}
+                </ScrollView>
+              </View>
             )}
           </View>
         </View>

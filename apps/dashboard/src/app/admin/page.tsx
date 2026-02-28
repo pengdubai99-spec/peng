@@ -42,8 +42,8 @@ export default function AdminPage() {
   ]);
 
   const [partners, setPartners] = useState([
-    { id: 1, name: "Skyline Logistics", email: "info@skyline.ae", vehicles: 5, tracking: true, camera: true, accessKey: "PENG-SK-2026" },
-    { id: 2, name: "Desert Fleet Co", email: "ops@desertfleet.com", vehicles: 12, tracking: true, camera: false, accessKey: "PENG-DF-2026" },
+    { id: 1, name: "Skyline Logistics", email: "info@skyline.ae", vehicles: 5, tracking: true, camera: true, accessKey: "PENG-SK-2026", status: "Active", trustScore: 98, revenue: "AED 12,400" },
+    { id: 2, name: "Desert Fleet Co", email: "ops@desertfleet.com", vehicles: 12, tracking: true, camera: false, accessKey: "PENG-DF-2026", status: "Pending", trustScore: 85, revenue: "AED 8,200" },
   ]);
 
   const [formData, setFormData] = useState<any>({});
@@ -75,7 +75,10 @@ export default function AdminPage() {
          vehicles: 0,
          tracking: formData.tracking || false,
          camera: formData.camera || false,
-         accessKey: `PENG-ID-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+         accessKey: `PENG-ID-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+         status: "Active",
+         trustScore: 100,
+         revenue: "AED 0"
        };
        setPartners([...partners, newPartner]);
     }
@@ -283,7 +286,10 @@ export default function AdminPage() {
                   <tr key={p.id} className="hover:bg-white/[0.02] transition-colors group">
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center font-bold text-emerald-400">{p.name.charAt(0)}</div>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold relative ${p.status === 'Active' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          {p.name.charAt(0)}
+                          <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#0c0c1e] ${p.status === 'Active' ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-amber-500'}`} />
+                        </div>
                         <div>
                           <p className="text-sm font-bold text-white tracking-wide">{p.name}</p>
                           <p className="text-[10px] text-slate-500">{p.email}</p>
@@ -291,18 +297,29 @@ export default function AdminPage() {
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <code className="text-[10px] font-black text-indigo-400 bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10">{p.accessKey}</code>
+                      <div className="space-y-1.5">
+                        <code className="text-[10px] font-black text-indigo-400 bg-indigo-500/5 px-2 py-1 rounded border border-indigo-500/10 block w-fit">{p.accessKey}</code>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase">{p.vehicles} VEHICLES CONNECTED</p>
+                      </div>
                     </td>
                     <td className="px-8 py-6">
-                      <div className="flex gap-2">
-                        {p.tracking && <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-black border border-blue-500/20">GPS</span>}
-                        {p.camera && <span className="px-2 py-0.5 rounded bg-pink-500/10 text-pink-400 text-[9px] font-black border border-pink-500/20">VIDEO</span>}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                           {p.tracking && <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[9px] font-black border border-blue-500/20">GPS</span>}
+                           {p.camera && <span className="px-2 py-0.5 rounded bg-pink-500/10 text-pink-400 text-[9px] font-black border border-pink-500/20">AI_CAM</span>}
+                        </div>
+                        <div className="h-1 w-24 bg-white/5 rounded-full overflow-hidden">
+                           <div className="h-full bg-indigo-500" style={{ width: `${p.trustScore}%` }} />
+                        </div>
                       </div>
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                        <button className="p-2.5 rounded-xl bg-white/[0.05] hover:bg-indigo-500/20 hover:text-indigo-400 transition-all"><Edit className="w-4 h-4" /></button>
-                        <button className="p-2.5 rounded-xl bg-white/[0.05] hover:bg-red-500/20 hover:text-red-400 transition-all"><Trash2 className="w-4 h-4" /></button>
+                      <div className="flex flex-col items-end gap-1">
+                        <p className="text-xs font-black text-white">{p.revenue}</p>
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                          <button className="p-2 rounded-lg bg-white/[0.05] hover:bg-indigo-500/20 hover:text-indigo-400 transition-all text-[10px] font-bold uppercase tracking-tighter">ANALYTICS</button>
+                          <button className="p-2 rounded-lg bg-white/[0.05] hover:bg-red-500/20 hover:text-red-400 transition-all"><Trash2 className="w-4 h-4" /></button>
+                        </div>
                       </div>
                     </td>
                   </tr>

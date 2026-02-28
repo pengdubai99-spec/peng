@@ -28,12 +28,14 @@ import {
   AlertTriangle,
   Cpu,
   Zap,
-  ShieldCheck
+  ShieldCheck,
+  ArrowLeft
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import LiveTracking from "../../components/LiveTracking";
+const AnalyticsCharts = dynamic(() => import('../../components/AnalyticsCharts'), { ssr: false });
 
 // Tracking Service URL
 const TRACKING_URL = "http://localhost:3005";
@@ -48,6 +50,7 @@ export default function DashboardPage() {
   const isRtl = lang === 'ar';
 
   const [vehicles, setVehicles] = useState<Record<string, any>>({});
+  const [locationHistory, setLocationHistory] = useState<any[]>([]);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -68,6 +71,12 @@ export default function DashboardPage() {
     });
 
     socketRef.current.on("location:data", (data: any) => {
+      // Filter for Fleet Managers: only show their vehicles
+      if (user?.role === 'FLEET_MANAGER' && data.fleet !== user.name) {
+        return;
+      }
+
+      const timestamp = new Date().toLocaleTimeString('en-GB', { hour12: false });
       setVehicles(prev => ({
         ...prev,
         [data.vehicleId]: {
@@ -75,6 +84,7 @@ export default function DashboardPage() {
           lastUpdate: new Date().getTime()
         }
       }));
+      setLocationHistory(prev => [...prev, { ...data, timestamp }].slice(-100));
     });
 
     socketRef.current.on("ai:alert", (data: any) => {
@@ -314,13 +324,13 @@ export default function DashboardPage() {
                 <div className="flex items-end justify-between">
                   <div>
                     <h1 className="text-3xl font-bold text-white mb-2">
-                      {user?.role === 'FLEET_MANAGER' 
-                        ? (lang === 'tr' ? `Hos geldin, ${user?.name}` : `Welcome, ${user?.name}`)
+                       {user?.role === 'FLEET_MANAGER' 
+                        ? (lang === 'tr' ? `Hos geldin, ${user?.name}` : (lang === 'ar' ? `أهلاً بك، ${user?.name}` : `Welcome, ${user?.name}`))
                         : (lang === 'ar' ? `أهلاً بك، ${user?.name || "المدير"}` : (lang === 'tr' ? `Hos geldin, ${user?.name || "Admin"}` : `Welcome back, ${user?.name || "Admin"}`))} 👋
                     </h1>
                     <p className="text-slate-400 text-sm">
                       {user?.role === 'FLEET_MANAGER' 
-                        ? (lang === 'tr' ? `${user?.name} filosunun guncel durumunu izleyin.` : `Monitoring your fleet: ${user?.name}.`)
+                        ? (lang === 'tr' ? `${user?.name} filosunun guncel performansini ve 5 aktif aracini izleyin.` : `Monitoring performance for ${user?.name} fleet - 5 active units.`)
                         : (lang === 'ar' ? 'يوجد حالياً ١٢ مركبة نشطة في سماء دبي.' : (lang === 'tr' ? 'Seyh Zayed Yolunda 12 arac aktif.' : '12 vehicles active near Sheikh Zayed Road.'))}
                     </p>
                   </div>
@@ -377,6 +387,44 @@ export default function DashboardPage() {
                     </motion.div>
                   ))}
                 </div>
+
+                {/* Partner Specific Performance Card (Only for Managers) */}
+                {user?.role === 'FLEET_MANAGER' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                  >
+                    <div className="glass-card p-6 rounded-3xl border border-indigo-500/10 bg-indigo-500/[0.02]">
+                       <div className="flex items-center gap-3 mb-4">
+                          <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                          <h3 className="text-sm font-black uppercase tracking-widest text-white">Fleet Quality Score</h3>
+                       </div>
+                       <div className="flex items-end gap-4">
+                          <span className="text-4xl font-black text-white">94/100</span>
+                          <span className="text-[10px] font-bold text-emerald-400 mb-2">GOLD PARTNER STATUS</span>
+                       </div>
+                       <p className="text-[10px] text-slate-500 mt-4 leading-relaxed uppercase tracking-tighter">Your fleet safety performance is 12% higher than the regional average.</p>
+                    </div>
+                    
+                    <div className="glass-card p-6 rounded-3xl border border-purple-500/10 bg-purple-500/[0.02]">
+                       <div className="flex items-center gap-3 mb-4">
+                          <Zap className="w-5 h-5 text-purple-400" />
+                          <h3 className="text-sm font-black uppercase tracking-widest text-white">Estimated Monthly Revenue</h3>
+                       </div>
+                       <div className="flex items-end gap-4">
+                          <span className="text-4xl font-black text-white">AED 14.2k</span>
+                          <span className="text-[10px] font-bold text-slate-500 mb-2">+AED 2.1k vs Prev. Month</span>
+                       </div>
+                       <div className="mt-4 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-full bg-purple-500" style={{ width: '75%' }} />
+                       </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* REAL-TIME ANALYTICS SECTION */}
+                <AnalyticsCharts vehicles={vehicles} history={locationHistory} lang={lang} />
 
                 {/* Map & List Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

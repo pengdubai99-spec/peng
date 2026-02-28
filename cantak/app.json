@@ -45,6 +45,7 @@
     "android": {
       "package": "com.cantak.driver",
       "newArchEnabled": false,
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#050510",
         "foregroundImage": "./assets/icon.png"
