@@ -544,13 +544,25 @@
 
     peerConnection.ontrack = (event) => {
       addLog('Video stream aliniyor!');
-      remoteVideo.srcObject = event.streams[0];
+      console.log('Track event:', event);
+      
+      if (remoteVideo.srcObject !== event.streams[0]) {
+        remoteVideo.srcObject = event.streams[0];
+        addLog('Stream baglandi');
+      }
+
       remoteVideo.style.display = 'block';
       videoPlaceholder.style.display = 'none';
       liveBadge.style.display = 'flex';
 
-      // Show resolution when metadata loaded
+      // Enure video plays
+      remoteVideo.play().catch(e => {
+        addLog('Oynatma hatasi: ' + e.message);
+        console.warn('Play error:', e);
+      });
+
       remoteVideo.onloadedmetadata = () => {
+        addLog(`Codec/Cozunurluk: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
         document.getElementById('resolutionInfo').textContent =
           `${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`;
       };
