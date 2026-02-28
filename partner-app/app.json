@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "PENG Partner",
+    "slug": "peng-partner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050510"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.peng.partner",
+      "infoPlist": {
+        "NSCameraUsageDescription": "PENG Partner canli arac kamerasini izlemek icin gereklidir.",
+        "NSMicrophoneUsageDescription": "PENG Partner ses almak icin mikrofona erisim gerektirir."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#050510"
+      },
+      "package": "com.peng.partner",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "plugins": [
+      "./plugins/withWebRTC"
+    ]
+  }
+}
