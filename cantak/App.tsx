@@ -10,17 +10,13 @@ import {
   Alert,
   Platform,
   StatusBar,
-  AppState,
+  PermissionsAndroid,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import { io, Socket } from 'socket.io-client';
-import {
-  mediaDevices,
-  MediaStream,
-} from '@livekit/react-native-webrtc';
-import { Room, RoomEvent, LocalVideoTrack, LocalAudioTrack, registerGlobals } from '@livekit/react-native';
+import { Room, RoomEvent } from 'livekit-client';
+import { registerGlobals } from '@livekit/react-native';
 
 registerGlobals();
 
@@ -37,10 +33,6 @@ interface LogEntry {
 
 // ── App ─────────────────────────────────────────────────────
 export default function App() {
-  // permissions
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [locationGranted, setLocationGranted] = useState(false);
-
   // settings
   const [settingsVisible, setSettingsVisible] = useState(true);
   const [serverIP, setServerIP] = useState(DEFAULT_SERVER);
@@ -50,17 +42,14 @@ export default function App() {
   // state
   const [connected, setConnected] = useState(false);
   const [streaming, setStreaming] = useState(false);
-  const [facing, setFacing] = useState<'front' | 'back'>('back');
   const [speed, setSpeed] = useState(0);
   const [heading, setHeading] = useState(0);
-  const [viewers, setViewers] = useState(0);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
 
   // refs
   const socketRef = useRef<Socket | null>(null);
   const livekitRoomRef = useRef<Room | null>(null);
-  const localStream = useRef<MediaStream | null>(null);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
 
   // ── Logging ─────────────────────────────────────────────
@@ -72,12 +61,25 @@ export default function App() {
   // ── Permissions ─────────────────────────────────────────
   useEffect(() => {
     (async () => {
-      if (!cameraPermission?.granted) {
-        await requestCameraPermission();
+      // Request camera + mic permissions for Android
+      if (Platform.OS === 'android') {
+        try {
+          const grants = await PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.CAMERA,
+            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+          ]);
+          const camOk = grants[PermissionsAndroid.PERMISSIONS.CAMERA] === 'granted';
+          const micOk = grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === 'granted';
+          log(`Kamera: ${camOk ? 'OK' : 'Reddedildi'}, Mikrofon: ${micOk ? 'OK' : 'Reddedildi'}`, camOk && micOk ? 'success' : 'error');
+        } catch (err: any) {
+          log(`İzin hatası: ${err.message}`, 'error');
+        }
       }
+
+      // Location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
-        setLocationGranted(true);
+        log('Konum izni verildi', 'success');
         const bg = await Location.requestBackgroundPermissionsAsync();
         if (bg.status === 'granted') {
           log('Arka plan konum izni verildi', 'success');
@@ -92,7 +94,6 @@ export default function App() {
       socketRef.current.disconnect();
     }
 
-    // If server looks like a domain (contains dots but no port needed), use https
     const isCloudServer = serverIP.includes('.') && !serverIP.match(/^\d+\.\d+\.\d+\.\d+$/);
     const url = isCloudServer
       ? `https://${serverIP}`
@@ -111,9 +112,8 @@ export default function App() {
     socket.on('connect', async () => {
       setConnected(true);
       log('Sunucuya bağlandı', 'success');
-      // Start GPS tracking
       startGPSTracking(socket);
-      // Auto-start camera streaming via LiveKit
+      // Auto-start LiveKit camera
       try {
         const started = await startLivekitStream();
         if (started) {
@@ -145,11 +145,9 @@ export default function App() {
 
     socket.on('connect_error', (err) => {
       log(`Hata: ${err.message} (${err.name})`, 'error');
-      console.log('Socket Error:', err);
     });
 
     socketRef.current = socket;
-    // Don't close modal automatically, instead show logs
     setShowLogs(true);
   }, [serverIP, serverPort, vehicleId, log]);
 
@@ -168,7 +166,7 @@ export default function App() {
         },
         (location) => {
           const { latitude, longitude, speed: spd, heading: hdg, altitude } = location.coords;
-          setSpeed(spd ? Math.round(spd * 3.6) : 0); // m/s -> km/h
+          setSpeed(spd ? Math.round(spd * 3.6) : 0);
           setHeading(hdg || 0);
 
           socket.emit('location:update', {
@@ -199,16 +197,16 @@ export default function App() {
         livekitRoomRef.current.disconnect();
       }
 
-      // 1. Fetch token from Node.js standard API
+      // 1. Fetch token
       const isCloudServer = serverIP.includes('.') && !serverIP.match(/^\d+\.\d+\.\d+\.\d+$/);
       const apiUrl = isCloudServer
         ? `https://${serverIP}/livekit/token?room=${vehicleId}&participant=${vehicleId}&role=publisher`
         : `http://${serverIP}:${serverPort}/livekit/token?room=${vehicleId}&participant=${vehicleId}&role=publisher`;
-      
+
       log(`LiveKit Token: ${apiUrl}`, 'info');
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error('Token alınamadı');
-      
+
       const { token } = await response.json();
       const LIVEKIT_URL = 'wss://peng-cantak-3avcr64w.livekit.cloud';
 
@@ -222,35 +220,18 @@ export default function App() {
       await room.connect(LIVEKIT_URL, token);
       log('LiveKit odasına bağlanıldı', 'success');
 
-      // 3. Get Media Stream & Publish
-      const stream = await mediaDevices.getUserMedia({
-        audio: true,
-        video: {
-          facingMode: facing === 'front' ? 'user' : 'environment',
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          frameRate: { max: 15 },
-        },
-      });
+      // 3. Enable camera & microphone via LiveKit API (no manual mediaDevices)
+      await room.localParticipant.setCameraEnabled(true);
+      log('Kamera açıldı', 'success');
 
-      localStream.current = stream as MediaStream;
-      const videoTrack = stream.getVideoTracks()[0];
-      const audioTrack = stream.getAudioTracks()[0];
-
-      if (videoTrack) {
-        const lvt = new LocalVideoTrack(videoTrack);
-        await room.localParticipant.publishTrack(lvt);
-      }
-      if (audioTrack) {
-        const lat = new LocalAudioTrack(audioTrack);
-        await room.localParticipant.publishTrack(lat);
-      }
+      await room.localParticipant.setMicrophoneEnabled(true);
+      log('Mikrofon açıldı', 'success');
 
       livekitRoomRef.current = room;
       setStreaming(true);
       log('LiveKit üzerine yayın başlatıldı!', 'success');
 
-      // Notify the tracking server that this vehicle is streaming
+      // Notify the tracking server
       if (socketRef.current?.connected) {
         socketRef.current.emit('webrtc:start-stream', { vehicleId });
         log('Sunucuya yayın bildirimi gönderildi', 'success');
@@ -262,7 +243,7 @@ export default function App() {
       setStreaming(false);
       return false;
     }
-  }, [facing, log, serverIP, serverPort, vehicleId]);
+  }, [log, serverIP, serverPort, vehicleId]);
 
   // ── Cleanup ─────────────────────────────────────────────
   useEffect(() => {
@@ -270,7 +251,6 @@ export default function App() {
       locationSub.current?.remove();
       socketRef.current?.disconnect();
       livekitRoomRef.current?.disconnect();
-      localStream.current?.getTracks().forEach((t: any) => t.stop());
     };
   }, []);
 
@@ -295,19 +275,24 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#050510" />
 
-      {/* Camera Preview - her zaman açık */}
-      {cameraPermission?.granted && connected && (
-        <CameraView style={styles.camera} facing={facing}>
-          <View style={styles.cameraOverlay}>
-            <TouchableOpacity
-              style={styles.flipBtn}
-              onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}
-            >
-              <Text style={styles.flipText}>⟲</Text>
-            </TouchableOpacity>
+      {/* Camera Status Area */}
+      <View style={styles.cameraArea}>
+        {streaming ? (
+          <View style={styles.liveIndicator}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>CANLI YAYIN</Text>
+            <Text style={styles.liveSubText}>Kamera LiveKit üzerinden yayında</Text>
           </View>
-        </CameraView>
-      )}
+        ) : connected ? (
+          <View style={styles.liveIndicator}>
+            <Text style={styles.waitingText}>Kamera başlatılıyor...</Text>
+          </View>
+        ) : (
+          <View style={styles.liveIndicator}>
+            <Text style={styles.waitingText}>Sunucuya bağlanın</Text>
+          </View>
+        )}
+      </View>
 
       {/* Status Bar */}
       <View style={styles.statusBar}>
@@ -320,7 +305,6 @@ export default function App() {
             <>
               <View style={[styles.dot, { backgroundColor: '#ff0000', marginLeft: 16 }]} />
               <Text style={styles.statusText}>CANLI</Text>
-              <Text style={styles.viewerText}>{viewers} izleyici</Text>
             </>
           )}
         </View>
@@ -332,7 +316,6 @@ export default function App() {
 
       {/* Control Buttons */}
       <View style={styles.controls}>
-        {/* Kamera durumu */}
         <View style={[styles.btn, streaming ? styles.btnStart : styles.btnSettings]}>
           <Text style={[styles.btnText, !streaming && { color: '#888' }]}>
             {streaming ? '🔴 KAMERA AÇIK - Otomatik Yayın' : '⏳ Kamera bekleniyor...'}
@@ -386,17 +369,16 @@ export default function App() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>CanTak Ayarları</Text>
 
-            <Text style={styles.label}>Sunucu IP</Text>
+            <Text style={styles.label}>Sunucu</Text>
             <TextInput
               style={styles.input}
               value={serverIP}
               onChangeText={setServerIP}
               placeholder="saferide-tracking.onrender.com"
               placeholderTextColor="#666"
-              keyboardType="numeric"
             />
 
-            <Text style={styles.label}>Port</Text>
+            <Text style={styles.label}>Port (lokal için)</Text>
             <TextInput
               style={styles.input}
               value={serverPort}
@@ -466,30 +448,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#050510',
   },
-  camera: {
+  cameraArea: {
     flex: 1,
-  },
-  cameraOverlay: {
-    position: 'absolute',
-    top: 50,
-    right: 16,
-  },
-  flipBtn: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0a0a1a',
   },
-  flipText: {
-    color: '#fff',
+  liveIndicator: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  liveDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#ff0000',
+  },
+  liveText: {
+    color: '#ff4444',
     fontSize: 24,
+    fontWeight: 'bold',
+    letterSpacing: 4,
+  },
+  liveSubText: {
+    color: '#666',
+    fontSize: 12,
+  },
+  waitingText: {
+    color: '#555',
+    fontSize: 16,
   },
   statusBar: {
     backgroundColor: '#0a0a1a',
     padding: 16,
-    paddingTop: Platform.OS === 'android' ? 40 : 50,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
   },
   statusRow: {
     flexDirection: 'row',
@@ -505,11 +498,6 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#ccc',
     fontSize: 14,
-  },
-  viewerText: {
-    color: '#888',
-    fontSize: 12,
-    marginLeft: 8,
   },
   speedText: {
     color: '#00ff88',
@@ -532,9 +520,6 @@ const styles = StyleSheet.create({
   },
   btnStart: {
     backgroundColor: '#00aa55',
-  },
-  btnStop: {
-    backgroundColor: '#cc3333',
   },
   btnText: {
     color: '#fff',
