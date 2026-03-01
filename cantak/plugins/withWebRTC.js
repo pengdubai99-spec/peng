@@ -1,7 +1,7 @@
 const { withAndroidManifest, withInfoPlist } = require('expo/config-plugins');
 
 function withWebRTC(config) {
-  // Android: Add permissions for WebRTC
+  // Android: Add permissions for WebRTC and enable cleartext traffic
   config = withAndroidManifest(config, (config) => {
     const manifest = config.modResults.manifest;
 
@@ -28,6 +28,12 @@ function withWebRTC(config) {
         });
       }
     });
+
+    // Enable cleartext traffic for local dev
+    const application = manifest.application?.[0];
+    if (application) {
+      application.$['android:usesCleartextTraffic'] = 'true';
+    }
 
     return config;
   });

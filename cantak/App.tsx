@@ -19,7 +19,7 @@ import { io, Socket } from 'socket.io-client';
 import {
   mediaDevices,
   MediaStream,
-} from 'react-native-webrtc';
+} from '@livekit/react-native-webrtc';
 import { Room, RoomEvent, LocalVideoTrack, LocalAudioTrack, registerGlobals } from '@livekit/react-native';
 
 registerGlobals();
@@ -141,11 +141,6 @@ export default function App() {
       } catch (err: any) {
         log(`Yeniden başlatma hatası: ${err.message}`, 'error');
       }
-    });
-
-    socket.on('connect_error', (err) => {
-      log(`Hata: ${err.message} (${err.name})`, 'error');
-      console.log('Socket Error:', err);
     });
 
     socket.on('connect_error', (err) => {
