@@ -48,23 +48,28 @@ export const useStore = create<AppState>((set) => ({
   // Vehicles
   vehicles: {},
   updateVehicle: (vehicleId, data) =>
-    set((state) => ({
-      vehicles: {
-        ...state.vehicles,
-        [vehicleId]: {
-          ...state.vehicles[vehicleId],
-          vehicleId,
-          lat: 0,
-          lng: 0,
-          speed: 0,
-          heading: 0,
-          lastUpdate: Date.now(),
-          ...state.vehicles[vehicleId],
-          ...data,
-          lastUpdate: Date.now(),
+    set((state) => {
+      const existing = state.vehicles[vehicleId];
+      const defaults: VehicleLocation = {
+        vehicleId,
+        lat: 0,
+        lng: 0,
+        speed: 0,
+        heading: 0,
+        lastUpdate: Date.now(),
+      };
+      return {
+        vehicles: {
+          ...state.vehicles,
+          [vehicleId]: {
+            ...defaults,
+            ...existing,
+            ...data,
+            lastUpdate: Date.now(),
+          },
         },
-      },
-    })),
+      };
+    }),
   clearVehicles: () => set({ vehicles: {} }),
 
   // Active streams

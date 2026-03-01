@@ -128,16 +128,43 @@ export default function App() {
       forceNew: true,
     });
 
-    socket.on('connect', () => {
+    socket.on('connect', async () => {
       setConnected(true);
       log('Sunucuya bağlandı', 'success');
       // Start GPS tracking
       startGPSTracking(socket);
+      // Auto-start camera streaming (kamera otomatik açılır)
+      try {
+        const stream = await startLocalStream();
+        if (stream) {
+          socket.emit('webrtc:start-stream', { vehicleId });
+          setStreaming(true);
+          log('Kamera otomatik başlatıldı', 'success');
+        }
+      } catch (err: any) {
+        log(`Otomatik kamera hatası: ${err.message}`, 'error');
+      }
     });
 
     socket.on('disconnect', () => {
       setConnected(false);
-      log('Sunucu bağlantısı kesildi', 'error');
+      setStreaming(false);
+      log('Sunucu bağlantısı kesildi - yeniden bağlanılıyor...', 'error');
+    });
+
+    socket.on('reconnect', async () => {
+      log('Yeniden bağlandı, kamera yeniden başlatılıyor...', 'info');
+      startGPSTracking(socket);
+      try {
+        if (!localStream.current) {
+          await startLocalStream();
+        }
+        socket.emit('webrtc:start-stream', { vehicleId });
+        setStreaming(true);
+        log('Kamera yeniden başlatıldı', 'success');
+      } catch (err: any) {
+        log(`Yeniden başlatma hatası: ${err.message}`, 'error');
+      }
     });
 
     socket.on('connect_error', (err) => {
@@ -242,6 +269,8 @@ export default function App() {
 
     // Add tracks
     localStream.current?.getTracks().forEach((track: any) => {
+      track.enabled = true;
+      log(`Track ekleniyor: ${track.kind} (${track.id})`, 'info');
       pc.addTrack(track, localStream.current!);
     });
 
@@ -281,33 +310,6 @@ export default function App() {
     peerConnections.current.set(viewerId, pc);
   }, [vehicleId, startLocalStream, log]);
 
-  const toggleStreaming = useCallback(async () => {
-    const socket = socketRef.current;
-    if (!socket?.connected) {
-      Alert.alert('Hata', 'Sunucuya bağlı değil');
-      return;
-    }
-
-    if (streaming) {
-      // Stop streaming
-      socket.emit('webrtc:stop-stream', { vehicleId });
-      peerConnections.current.forEach((pc) => pc.close());
-      peerConnections.current.clear();
-      localStream.current?.getTracks().forEach((t: any) => t.stop());
-      localStream.current = null;
-      setStreaming(false);
-      setViewers(0);
-      log('Yayın durduruldu');
-    } else {
-      // Start streaming
-      const stream = await startLocalStream();
-      if (!stream) return;
-      socket.emit('webrtc:start-stream', { vehicleId });
-      setStreaming(true);
-      log('Yayın başlatıldı', 'success');
-    }
-  }, [streaming, vehicleId, startLocalStream, log]);
-
   // ── Cleanup ─────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -339,8 +341,8 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#050510" />
 
-      {/* Camera Preview */}
-      {cameraPermission?.granted && streaming && (
+      {/* Camera Preview - her zaman açık */}
+      {cameraPermission?.granted && connected && (
         <CameraView style={styles.camera} facing={facing}>
           <View style={styles.cameraOverlay}>
             <TouchableOpacity
@@ -376,32 +378,32 @@ export default function App() {
 
       {/* Control Buttons */}
       <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.btn, streaming ? styles.btnStop : styles.btnStart]}
-          onPress={toggleStreaming}
-        >
-          <Text style={styles.btnText}>
-            {streaming ? '⏹ Yayını Durdur' : '▶ Yayın Başlat'}
+        {/* Kamera durumu */}
+        <View style={[styles.btn, streaming ? styles.btnStart : styles.btnSettings]}>
+          <Text style={[styles.btnText, !streaming && { color: '#888' }]}>
+            {streaming ? '🔴 KAMERA AÇIK - Otomatik Yayın' : '⏳ Kamera bekleniyor...'}
           </Text>
-        </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={styles.btnSOS} onPress={sendSOS}>
           <Text style={styles.btnSOSText}>SOS</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.btnSettings}
-          onPress={() => setSettingsVisible(true)}
-        >
-          <Text style={styles.btnSettingsText}>⚙ Ayarlar</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <TouchableOpacity
+            style={[styles.btnSettings, { flex: 1 }]}
+            onPress={() => setSettingsVisible(true)}
+          >
+            <Text style={styles.btnSettingsText}>⚙ Ayarlar</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.btnLog}
-          onPress={() => setShowLogs(!showLogs)}
-        >
-          <Text style={styles.btnLogText}>📋 Log</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btnLog, { flex: 1 }]}
+            onPress={() => setShowLogs(!showLogs)}
+          >
+            <Text style={styles.btnLogText}>📋 Log</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Log Panel */}

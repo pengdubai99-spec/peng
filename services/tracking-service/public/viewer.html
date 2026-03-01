@@ -582,6 +582,29 @@
 
       remoteVideo.onloadeddata = () => {
         addLog('Gorsel veri akisi basladi');
+        checkPlayback();
+      };
+
+      // Playback checker
+      let lastCheckTime = 0;
+      let blackScreenSeconds = 0;
+      const checkPlayback = () => {
+        if (remoteVideo.paused || remoteVideo.readyState < 2) return;
+        
+        if (remoteVideo.currentTime === lastCheckTime) {
+          blackScreenSeconds++;
+          if (blackScreenSeconds > 5) {
+            addLog('Uyari: Goruntu donmus olabilir, yenileniyor...');
+            const currentStream = remoteVideo.srcObject;
+            remoteVideo.srcObject = null;
+            setTimeout(() => { remoteVideo.srcObject = currentStream; remoteVideo.play(); }, 100);
+            blackScreenSeconds = 0;
+          }
+        } else {
+          blackScreenSeconds = 0;
+        }
+        lastCheckTime = remoteVideo.currentTime;
+        setTimeout(checkPlayback, 1000);
       };
     };
 

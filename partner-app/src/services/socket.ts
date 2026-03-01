@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 
-const TRACKING_URL = 'http://localhost:3005';
+const TRACKING_URL = 'https://saferide-tracking.onrender.com';
 
 let socket: Socket | null = null;
 

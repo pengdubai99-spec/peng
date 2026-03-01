@@ -59,9 +59,8 @@ export default function FleetScreen({ onTrack, onLiveView, onLogout }: FleetScre
     });
 
     socket.on('webrtc:stream-list', (data: any) => {
-      if (data.streams) {
-        setActiveStreams(data.streams.map((s: any) => s.vehicleId || s));
-      }
+      const streams = data.activeStreams || data.streams || [];
+      setActiveStreams(streams.map((s: any) => s.vehicleId || s));
     });
 
     return () => {

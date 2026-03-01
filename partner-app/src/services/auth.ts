@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const AUTH_URL = 'http://localhost:3001';
+const AUTH_URL = 'http://26.90.192.221:3001';
 
 export interface AuthUser {
   id: string;
