@@ -543,7 +543,8 @@
     peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     peerConnection.ontrack = (event) => {
-      addLog('Medya kanali yakalandi: ' + event.track.kind);
+      const track = event.track;
+      addLog(`Kanal yakalandi: ${track.kind} | Durum: ${track.readyState} | Etkin: ${track.enabled}`);
       console.log('Track event:', event);
       
       if (!remoteVideo.srcObject) {
