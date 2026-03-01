@@ -198,8 +198,6 @@ export default function App() {
   }, [vehicleId, log]);
 
   // ── LiveKit WebRTC ────────────────────────────────────────
-  const livekitRoomRef = useRef<Room | null>(null);
-
   const startLivekitStream = useCallback(async () => {
     try {
       if (livekitRoomRef.current) {
