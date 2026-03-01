@@ -33,7 +33,13 @@
       ]
     },
     "plugins": [
-      "./plugins/withWebRTC"
-    ]
+      "./plugins/withWebRTC",
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a9a9ec9a-257c-4c5a-bd27-b659ba2749c7"
+      }
+    }
   }
 }

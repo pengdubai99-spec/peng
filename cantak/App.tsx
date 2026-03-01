@@ -298,7 +298,40 @@ export default function App() {
     });
 
     // Create and send offer
-    const offer = await pc.createOffer({});
+    let offer = await pc.createOffer({});
+    
+    // SDP Manipulation: Force VP8 and limit bitrate
+    let sdp = offer.sdp || '';
+    
+    // 1. Force VP8 explicitly
+    const vp8Regex = /m=video.*?\r\n/g;
+    const vp8Match = sdp.match(vp8Regex);
+    if (vp8Match) {
+      // Find VP8 payload type
+      const rtpMapRegex = /a=rtpmap:(\d+) VP8\/90000\r\n/g;
+      let vp8PayloadType = null;
+      let match;
+      while ((match = rtpMapRegex.exec(sdp)) !== null) {
+        vp8PayloadType = match[1];
+        break;
+      }
+      
+      if (vp8PayloadType) {
+        // Rewrite m=video line to favor VP8
+        sdp = sdp.replace(vp8Regex, (m: string) => {
+          const parts = m.split(' ');
+          const videoTypes = parts.slice(3).map((p: string) => p.trim());
+          // Move VP8 to the front
+          const newTypes = [vp8PayloadType, ...videoTypes.filter((t: string) => t !== vp8PayloadType)];
+          return `${parts[0]} ${parts[1]} ${parts[2]} ${newTypes.join(' ')}\r\n`;
+        });
+      }
+    }
+    
+    // 2. Limit Bitrate (AS: Application Specific maximum) for cellular data
+    sdp = sdp.replace(/a=mid:video\r\n/g, 'a=mid:video\r\nb=AS:500\r\n');
+    
+    offer = new RTCSessionDescription({ type: 'offer', sdp });
     await pc.setLocalDescription(offer);
 
     socket.emit('webrtc:offer', {
