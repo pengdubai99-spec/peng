@@ -17,34 +17,14 @@ import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import { io, Socket } from 'socket.io-client';
 import {
-  RTCPeerConnection,
-  RTCSessionDescription,
-  RTCIceCandidate,
   mediaDevices,
   MediaStream,
 } from 'react-native-webrtc';
+import { Room, RoomEvent, LocalVideoTrack, LocalAudioTrack, registerGlobals } from '@livekit/react-native';
+
+registerGlobals();
 
 // ── Config ──────────────────────────────────────────────────
-const STUN_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-];
-
 const DEFAULT_SERVER = 'saferide-tracking.onrender.com';
 const DEFAULT_PORT = '';
 
@@ -79,7 +59,7 @@ export default function App() {
 
   // refs
   const socketRef = useRef<Socket | null>(null);
-  const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const livekitRoomRef = useRef<Room | null>(null);
   const localStream = useRef<MediaStream | null>(null);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
 
@@ -133,13 +113,11 @@ export default function App() {
       log('Sunucuya bağlandı', 'success');
       // Start GPS tracking
       startGPSTracking(socket);
-      // Auto-start camera streaming (kamera otomatik açılır)
+      // Auto-start camera streaming via LiveKit
       try {
-        const stream = await startLocalStream();
-        if (stream) {
-          socket.emit('webrtc:start-stream', { vehicleId });
-          setStreaming(true);
-          log('Kamera otomatik başlatıldı', 'success');
+        const started = await startLivekitStream();
+        if (started) {
+          log('LiveKit kamera otomatik başlatıldı', 'success');
         }
       } catch (err: any) {
         log(`Otomatik kamera hatası: ${err.message}`, 'error');
@@ -156,12 +134,10 @@ export default function App() {
       log('Yeniden bağlandı, kamera yeniden başlatılıyor...', 'info');
       startGPSTracking(socket);
       try {
-        if (!localStream.current) {
-          await startLocalStream();
+        if (!livekitRoomRef.current) {
+          await startLivekitStream();
         }
-        socket.emit('webrtc:start-stream', { vehicleId });
-        setStreaming(true);
-        log('Kamera yeniden başlatıldı', 'success');
+        log('LiveKit Kamera yeniden başlatıldı', 'success');
       } catch (err: any) {
         log(`Yeniden başlatma hatası: ${err.message}`, 'error');
       }
@@ -172,25 +148,9 @@ export default function App() {
       console.log('Socket Error:', err);
     });
 
-    // WebRTC signaling
-    socket.on('webrtc:request-stream', async (data: { viewerId: string }) => {
-      log(`İzleyici bağlanıyor: ${data.viewerId.slice(0, 8)}`);
-      await createPeerConnection(socket, data.viewerId);
-    });
-
-    socket.on('webrtc:answer', async (data: { viewerId: string; sdp: string }) => {
-      const pc = peerConnections.current.get(data.viewerId);
-      if (pc) {
-        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: data.sdp }));
-        log('WebRTC answer alındı', 'success');
-      }
-    });
-
-    socket.on('webrtc:ice-candidate', async (data: { viewerId: string; candidate: any }) => {
-      const pc = peerConnections.current.get(data.viewerId);
-      if (pc && data.candidate) {
-        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-      }
+    socket.on('connect_error', (err) => {
+      log(`Hata: ${err.message} (${err.name})`, 'error');
+      console.log('Socket Error:', err);
     });
 
     socketRef.current = socket;
@@ -237,9 +197,39 @@ export default function App() {
     }
   }, [vehicleId, log]);
 
-  // ── WebRTC ──────────────────────────────────────────────
-  const startLocalStream = useCallback(async () => {
+  // ── LiveKit WebRTC ────────────────────────────────────────
+  const livekitRoomRef = useRef<Room | null>(null);
+
+  const startLivekitStream = useCallback(async () => {
     try {
+      if (livekitRoomRef.current) {
+        livekitRoomRef.current.disconnect();
+      }
+
+      // 1. Fetch token from Node.js standard API
+      const isCloudServer = serverIP.includes('.') && !serverIP.match(/^\d+\.\d+\.\d+\.\d+$/);
+      const apiUrl = isCloudServer
+        ? `https://${serverIP}/api/v1/livekit/token?room=${vehicleId}&participant=${vehicleId}&role=publisher`
+        : `http://${serverIP}:${serverPort}/api/v1/livekit/token?room=${vehicleId}&participant=${vehicleId}&role=publisher`;
+      
+      log(`LiveKit Token: ${apiUrl}`, 'info');
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error('Token alınamadı');
+      
+      const { token } = await response.json();
+      const LIVEKIT_URL = 'wss://peng-cantak-3avcr64w.livekit.cloud';
+
+      // 2. Setup Room
+      const room = new Room();
+      room.on(RoomEvent.Disconnected, () => {
+        log('LiveKit odasından çıkıldı', 'error');
+        setStreaming(false);
+      });
+
+      await room.connect(LIVEKIT_URL, token);
+      log('LiveKit odasına bağlanıldı', 'success');
+
+      // 3. Get Media Stream & Publish
       const stream = await mediaDevices.getUserMedia({
         audio: true,
         video: {
@@ -249,106 +239,38 @@ export default function App() {
           frameRate: { max: 15 },
         },
       });
+
       localStream.current = stream as MediaStream;
-      log('Yerel medya akışı başlatıldı', 'success');
-      return stream;
+      const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+
+      if (videoTrack) {
+        const lvt = new LocalVideoTrack(videoTrack);
+        await room.localParticipant.publishTrack(lvt);
+      }
+      if (audioTrack) {
+        const lat = new LocalAudioTrack(audioTrack);
+        await room.localParticipant.publishTrack(lat);
+      }
+
+      livekitRoomRef.current = room;
+      setStreaming(true);
+      log('LiveKit üzerine yayın başlatıldı!', 'success');
+      return true;
+
     } catch (err: any) {
-      log(`Medya hatası: ${err.message}`, 'error');
-      return null;
+      log(`LiveKit Hatası: ${err.message}`, 'error');
+      setStreaming(false);
+      return false;
     }
-  }, [facing, log]);
-
-  const createPeerConnection = useCallback(async (socket: Socket, viewerId: string) => {
-    // Ensure local stream exists
-    if (!localStream.current) {
-      const stream = await startLocalStream();
-      if (!stream) return;
-    }
-
-    const pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
-
-    // Add tracks
-    localStream.current?.getTracks().forEach((track: any) => {
-      track.enabled = true;
-      log(`Track ekleniyor: ${track.kind} (${track.id})`, 'info');
-      pc.addTrack(track, localStream.current!);
-    });
-
-    // ICE candidates
-    pc.addEventListener('icecandidate', (event: any) => {
-      if (event.candidate) {
-        socket.emit('webrtc:ice-candidate', {
-          vehicleId,
-          viewerId,
-          candidate: event.candidate,
-        });
-      }
-    });
-
-    pc.addEventListener('iceconnectionstatechange', () => {
-      const state = (pc as any).iceConnectionState;
-      log(`ICE: ${state}`);
-      if (state === 'connected') {
-        setViewers(prev => prev + 1);
-      } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-        setViewers(prev => Math.max(0, prev - 1));
-        peerConnections.current.delete(viewerId);
-        pc.close();
-      }
-    });
-
-    // Create and send offer
-    let offer = await pc.createOffer({});
-    
-    // SDP Manipulation: Force VP8 and limit bitrate
-    let sdp = offer.sdp || '';
-    
-    // 1. Force VP8 explicitly
-    const vp8Regex = /m=video.*?\r\n/g;
-    const vp8Match = sdp.match(vp8Regex);
-    if (vp8Match) {
-      // Find VP8 payload type
-      const rtpMapRegex = /a=rtpmap:(\d+) VP8\/90000\r\n/g;
-      let vp8PayloadType = null;
-      let match;
-      while ((match = rtpMapRegex.exec(sdp)) !== null) {
-        vp8PayloadType = match[1];
-        break;
-      }
-      
-      if (vp8PayloadType) {
-        // Rewrite m=video line to favor VP8
-        sdp = sdp.replace(vp8Regex, (m: string) => {
-          const parts = m.split(' ');
-          const videoTypes = parts.slice(3).map((p: string) => p.trim());
-          // Move VP8 to the front
-          const newTypes = [vp8PayloadType, ...videoTypes.filter((t: string) => t !== vp8PayloadType)];
-          return `${parts[0]} ${parts[1]} ${parts[2]} ${newTypes.join(' ')}\r\n`;
-        });
-      }
-    }
-    
-    // 2. Limit Bitrate (AS: Application Specific maximum) for cellular data
-    sdp = sdp.replace(/a=mid:video\r\n/g, 'a=mid:video\r\nb=AS:500\r\n');
-    
-    offer = new RTCSessionDescription({ type: 'offer', sdp });
-    await pc.setLocalDescription(offer);
-
-    socket.emit('webrtc:offer', {
-      vehicleId,
-      viewerId,
-      sdp: offer.sdp,
-    });
-
-    peerConnections.current.set(viewerId, pc);
-  }, [vehicleId, startLocalStream, log]);
+  }, [facing, log, serverIP, serverPort, vehicleId]);
 
   // ── Cleanup ─────────────────────────────────────────────
   useEffect(() => {
     return () => {
       locationSub.current?.remove();
       socketRef.current?.disconnect();
-      peerConnections.current.forEach((pc) => pc.close());
+      livekitRoomRef.current?.disconnect();
       localStream.current?.getTracks().forEach((t: any) => t.stop());
     };
   }, []);

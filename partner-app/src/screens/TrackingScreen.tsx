@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useStore } from '../store/useStore';
 import { getSocket } from '../services/socket';
 import StatusDot from '../components/StatusDot';
@@ -30,7 +30,6 @@ export default function TrackingScreen({ vehicleId, onBack }: TrackingScreenProp
         if (lat && lng) {
           setTrail((prev) => [...prev.slice(-200), { latitude: lat, longitude: lng }]);
 
-          // Haritayı araç konumuna odakla
           mapRef.current?.animateToRegion(
             {
               latitude: lat,
@@ -50,7 +49,6 @@ export default function TrackingScreen({ vehicleId, onBack }: TrackingScreenProp
     };
   }, [vehicleId]);
 
-  // İlk konuma git
   useEffect(() => {
     if (vehicle?.lat && vehicle?.lng) {
       setTrail([{ latitude: vehicle.lat, longitude: vehicle.lng }]);
@@ -61,7 +59,6 @@ export default function TrackingScreen({ vehicleId, onBack }: TrackingScreenProp
 
   return (
     <View style={styles.container}>
-      {/* Map */}
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -90,12 +87,10 @@ export default function TrackingScreen({ vehicleId, onBack }: TrackingScreenProp
         )}
       </MapView>
 
-      {/* Back Button */}
       <TouchableOpacity style={styles.backBtn} onPress={onBack}>
         <Text style={styles.backBtnText}>← Geri</Text>
       </TouchableOpacity>
 
-      {/* Info Card */}
       <View style={styles.infoCard}>
         <View style={styles.infoHeader}>
           <View style={styles.infoPlateRow}>
@@ -112,7 +107,7 @@ export default function TrackingScreen({ vehicleId, onBack }: TrackingScreenProp
           </View>
           <View style={styles.infoStatDivider} />
           <View style={styles.infoStatItem}>
-            <Text style={styles.infoStatLabel}>YÖN</Text>
+            <Text style={styles.infoStatLabel}>YON</Text>
             <Text style={styles.infoStatValue}>{vehicle?.heading?.toFixed(0) || '0'}°</Text>
           </View>
           <View style={styles.infoStatDivider} />

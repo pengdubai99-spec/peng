@@ -25,11 +25,18 @@
         "backgroundColor": "#050510"
       },
       "package": "com.peng.partner",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAZYIRO29w3ZCCnMQ51J6xk7Yx4M-PYCn4"
+        }
+      },
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ]
     },
     "plugins": [

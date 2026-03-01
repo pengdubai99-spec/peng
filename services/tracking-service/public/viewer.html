@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -329,31 +330,12 @@
   // CONFIG
   // ==========================================
   const WS_URL = window.location.origin;
-  const ICE_SERVERS = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-  ];
 
   // ==========================================
   // STATE
   // ==========================================
   let socket = null;
-  let peerConnection = null;
+  let livekitRoom = null;
   let viewerId = 'viewer-' + Math.random().toString(36).substr(2, 9);
   let currentVehicleId = null;
   let map = null;
@@ -474,23 +456,6 @@
       }
     });
 
-    // WebRTC: Receive offer (targeted to this viewer)
-    socket.on(`webrtc:offer:${viewerId}`, async (data) => {
-      addLog(`Offer alindi: ${data.vehicleId}`);
-      await handleOffer(data);
-    });
-
-    // WebRTC: Receive ICE candidate (targeted to this viewer)
-    socket.on(`webrtc:ice-candidate:${viewerId}`, async (data) => {
-      if (peerConnection && data.candidate) {
-        try {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {
-          console.error('ICE candidate error:', e);
-        }
-      }
-    });
-
     // GPS: Subscribe to location updates
     socket.on('location:data', (data) => {
       const lat = data.position?.lat ?? data.position?.latitude;
@@ -524,14 +489,14 @@
   }
 
   // ==========================================
-  // WebRTC: REQUEST STREAM
+  // LiveKit: CONNECT TO ROOM
   // ==========================================
-  function requestStream() {
+  async function requestStream() {
     const vehicleId = vehicleInput.value.trim();
     if (!vehicleId) return;
 
     // Cleanup previous
-    if (peerConnection) stopWatching();
+    if (livekitRoom) stopWatching();
 
     currentVehicleId = vehicleId;
     addLog(`Yayin istegi gonderiliyor: ${vehicleId}`);
@@ -539,169 +504,80 @@
     // Subscribe to GPS data for this vehicle
     socket.emit('location:subscribe', { vehicleId });
 
-    // Create peer connection
-    peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-
-    peerConnection.ontrack = (event) => {
-      const track = event.track;
-      addLog(`Kanal yakalandi: ${track.kind} | Durum: ${track.readyState} | Etkin: ${track.enabled}`);
-      console.log('Track event:', event);
-      
-      if (!remoteVideo.srcObject) {
-        remoteVideo.srcObject = new MediaStream();
-        addLog('Yeni medya akisi olusturuldu');
-      }
-      
-      remoteVideo.srcObject.addTrack(event.track);
-
-      remoteVideo.style.display = 'block';
-      videoPlaceholder.style.display = 'none';
-      liveBadge.style.display = 'flex';
-
-      // Ensure attributes for autoplay
-      remoteVideo.muted = true;
-      remoteVideo.setAttribute('playsinline', '');
-      remoteVideo.setAttribute('autoplay', '');
-
-      // Try to play immediately
-      const playPromise = remoteVideo.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          addLog('Video oynatiliyor');
-        }).catch(error => {
-          addLog('Oynatma baslatilamadi: ' + error.message);
-          console.warn('Autoplay prevented:', error);
-          // Show interactive overlay for user click requirement
-          videoPlaceholder.style.display = 'flex';
-          videoPlaceholder.style.cursor = 'pointer';
-          videoPlaceholder.innerHTML = '<i class="fas fa-play" style="font-size: 30px; margin-bottom: 10px;"></i><span>Yayini Baslatmak Icin Tiklayin</span>';
-          
-          videoPlaceholder.onclick = () => {
-             remoteVideo.play();
-             videoPlaceholder.style.display = 'none';
-             addLog('Oynatma manuel tetiklendi');
-          };
-        });
-      }
-
-      remoteVideo.onloadedmetadata = () => {
-        addLog(`Yayin Ozellikleri: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
-        document.getElementById('resolutionInfo').textContent =
-          `${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`;
-      };
-
-      remoteVideo.onloadeddata = () => {
-        addLog('Gorsel veri akisi basladi');
-        checkPlayback();
-      };
-
-      // Playback checker
-      let lastCheckTime = 0;
-      let blackScreenSeconds = 0;
-      const checkPlayback = () => {
-        if (remoteVideo.paused || remoteVideo.readyState < 2) return;
-        
-        if (remoteVideo.currentTime === lastCheckTime) {
-          blackScreenSeconds++;
-          if (blackScreenSeconds > 5) {
-            addLog('Uyari: Goruntu donmus olabilir, yenileniyor...');
-            const currentStream = remoteVideo.srcObject;
-            remoteVideo.srcObject = null;
-            setTimeout(() => { remoteVideo.srcObject = currentStream; remoteVideo.play(); }, 100);
-            blackScreenSeconds = 0;
-          }
-        } else {
-          blackScreenSeconds = 0;
-        }
-        lastCheckTime = remoteVideo.currentTime;
-        setTimeout(checkPlayback, 1000);
-      };
-    };
-
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit('webrtc:ice-candidate', {
-          vehicleId: currentVehicleId,
-          viewerId: viewerId,
-          candidate: event.candidate.toJSON(),
-        });
-      }
-    };
-
-    peerConnection.onconnectionstatechange = () => {
-      addLog(`Baglanti durumu: ${peerConnection.connectionState}`);
-      if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
-        addLog('Baglanti koptu');
-      }
-    };
-
-    // Request stream from the vehicle
-    socket.emit('webrtc:request-stream', {
-      vehicleId: currentVehicleId,
-      viewerId: viewerId,
-    });
-
-    watchBtn.style.display = 'none';
-    stopBtn.style.display = 'inline-block';
-  }
-
-  // ==========================================
-  // WebRTC: HANDLE OFFER
-  // ==========================================
-  async function handleOffer(data) {
-    if (!peerConnection) return;
-
     try {
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription({ type: 'offer', sdp: data.sdp })
-      );
-
-      let answer = await peerConnection.createAnswer();
-      
-      // SDP Manipulation: Force VP8 and limit bitrate
-      let sdp = answer.sdp || '';
-      
-      // 1. Force VP8 explicitly
-      const vp8Regex = /m=video.*?\r\n/g;
-      const vp8Match = sdp.match(vp8Regex);
-      if (vp8Match) {
-        // Find VP8 payload type
-        const rtpMapRegex = /a=rtpmap:(\d+) VP8\/90000\r\n/g;
-        let vp8PayloadType = null;
-        let match;
-        while ((match = rtpMapRegex.exec(sdp)) !== null) {
-          vp8PayloadType = match[1];
-          break;
-        }
-        
-        if (vp8PayloadType) {
-          // Rewrite m=video line to favor VP8
-          sdp = sdp.replace(vp8Regex, (m) => {
-            const parts = m.split(' ');
-            const videoTypes = parts.slice(3).map(p => p.trim());
-            // Move VP8 to the front
-            const newTypes = [vp8PayloadType, ...videoTypes.filter(t => t !== vp8PayloadType)];
-            return `${parts[0]} ${parts[1]} ${parts[2]} ${newTypes.join(' ')}\r\n`;
-          });
-        }
+      // 1. Fetch token from our Node.js Backend
+      addLog('LiveKit yetki bileti (token) aliniyor...');
+      const response = await fetch(`/api/v1/livekit/token?room=${currentVehicleId}&participant=${viewerId}&role=subscriber`);
+      if (!response.ok) {
+        throw new Error(`Token alinamadi: ${response.statusText}`);
       }
       
-      // 2. Limit Bitrate
-      sdp = sdp.replace(/a=mid:video\r\n/g, 'a=mid:video\r\nb=AS:500\r\n');
+      const { token } = await response.json();
       
-      answer = new RTCSessionDescription({ type: 'answer', sdp });
-      await peerConnection.setLocalDescription(answer);
+      // 2. Initialize LiveKit Room
+      livekitRoom = new LivekitClient.Room();
 
-      socket.emit('webrtc:answer', {
-        vehicleId: data.vehicleId,
-        viewerId: viewerId,
-        sdp: answer.sdp,
+      livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        addLog(`Kanal yakalandi: ${track.kind} | Etkin: ${!track.isMuted}`);
+        
+        if (track.kind === LivekitClient.Track.Kind.Video) {
+          // Attach track to our remoteVideo element
+          track.attach(remoteVideo);
+          
+          remoteVideo.style.display = 'block';
+          videoPlaceholder.style.display = 'none';
+          liveBadge.style.display = 'flex';
+
+          // Try to play immediately (LiveKit attach usually handles this, but just in case)
+          const playPromise = remoteVideo.play();
+          if (playPromise !== undefined) {
+             playPromise.catch(error => {
+               addLog('Oynatma baslatilamadi: ' + error.message);
+               console.warn('Autoplay prevented:', error);
+               
+               // Show interactive overlay for user click requirement
+               videoPlaceholder.style.display = 'flex';
+               videoPlaceholder.style.cursor = 'pointer';
+               videoPlaceholder.innerHTML = '<i class="fas fa-play" style="font-size: 30px; margin-bottom: 10px;"></i><span>Yayini Baslatmak Icin Tiklayin</span>';
+               
+               videoPlaceholder.onclick = () => {
+                  remoteVideo.play();
+                  videoPlaceholder.style.display = 'none';
+                  addLog('Oynatma manuel tetiklendi');
+               };
+             });
+          }
+
+          remoteVideo.onloadedmetadata = () => {
+            addLog(`Yayin Ozellikleri: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
+            document.getElementById('resolutionInfo').textContent = `${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`;
+          };
+
+          addLog('Video ekrana basarili sekilde baglandi');
+        }
       });
 
-      addLog('Answer gonderildi');
+      livekitRoom.on(LivekitClient.RoomEvent.Disconnected, () => {
+        addLog('LiveKit: Baglanti koptu');
+        stopWatching();
+      });
+
+      // 3. Connect to the LiveKit Server using the Token
+      addLog('LiveKit sunucusuna baglaniliyor...');
+      const LIVEKIT_URL = 'wss://peng-cantak-3avcr64w.livekit.cloud';
+      await livekitRoom.connect(LIVEKIT_URL, token, {
+        autoSubscribe: true, // Automatically subscribe to tracks published by the vehicle
+      });
+
+      addLog('LiveKit: Odaya basariyla baglanildi!');
+
+      watchBtn.style.display = 'none';
+      stopBtn.style.display = 'inline-block';
+
     } catch (e) {
-      addLog('Offer isleme hatasi: ' + e.message);
+      addLog(`Baglanti hatasi: ${e.message}`);
       console.error(e);
+      stopWatching();
     }
   }
 
@@ -709,9 +585,9 @@
   // STOP WATCHING
   // ==========================================
   function stopWatching() {
-    if (peerConnection) {
-      peerConnection.close();
-      peerConnection = null;
+    if (livekitRoom) {
+      livekitRoom.disconnect();
+      livekitRoom = null;
     }
 
     remoteVideo.srcObject = null;
