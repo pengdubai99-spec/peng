@@ -570,8 +570,17 @@
           addLog('Video oynatiliyor');
         }).catch(error => {
           addLog('Oynatma baslatilamadi: ' + error.message);
-          // Show a click-to-play overlay if needed
           console.warn('Autoplay prevented:', error);
+          // Show interactive overlay for user click requirement
+          videoPlaceholder.style.display = 'flex';
+          videoPlaceholder.style.cursor = 'pointer';
+          videoPlaceholder.innerHTML = '<i class="fas fa-play" style="font-size: 30px; margin-bottom: 10px;"></i><span>Yayini Baslatmak Icin Tiklayin</span>';
+          
+          videoPlaceholder.onclick = () => {
+             remoteVideo.play();
+             videoPlaceholder.style.display = 'none';
+             addLog('Oynatma manuel tetiklendi');
+          };
         });
       }
 
