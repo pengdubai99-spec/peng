@@ -209,8 +209,8 @@ export default function App() {
       // 1. Fetch token from Node.js standard API
       const isCloudServer = serverIP.includes('.') && !serverIP.match(/^\d+\.\d+\.\d+\.\d+$/);
       const apiUrl = isCloudServer
-        ? `https://${serverIP}/api/v1/livekit/token?room=${vehicleId}&participant=${vehicleId}&role=publisher`
-        : `http://${serverIP}:${serverPort}/api/v1/livekit/token?room=${vehicleId}&participant=${vehicleId}&role=publisher`;
+        ? `https://${serverIP}/livekit/token?room=${vehicleId}&participant=${vehicleId}&role=publisher`
+        : `http://${serverIP}:${serverPort}/livekit/token?room=${vehicleId}&participant=${vehicleId}&role=publisher`;
       
       log(`LiveKit Token: ${apiUrl}`, 'info');
       const response = await fetch(apiUrl);
@@ -256,6 +256,12 @@ export default function App() {
       livekitRoomRef.current = room;
       setStreaming(true);
       log('LiveKit üzerine yayın başlatıldı!', 'success');
+
+      // Notify the tracking server that this vehicle is streaming
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('webrtc:start-stream', { vehicleId });
+        log('Sunucuya yayın bildirimi gönderildi', 'success');
+      }
       return true;
 
     } catch (err: any) {

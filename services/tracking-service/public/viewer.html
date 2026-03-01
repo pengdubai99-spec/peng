@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SafeRide - Canli Izleme</title>
+  <title>SafeRide - Canlı İzleme</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -249,9 +249,12 @@
   <div class="header">
     <h1>
       <div class="dot" id="connDot"></div>
-      SAFERIDE IZLEME PANELI
+      SAFERIDE İZLEME PANELİ
     </h1>
-    <div class="status-badge offline" id="statusBadge">BAGLANTI BEKLENIYOR</div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button class="btn" style="background: #1e1e2d; color: #888; padding: 6px 12px; font-size: 10px;" onclick="toggleSimulation()" id="simBtn">SİMÜLASYONU BAŞLAT</button>
+      <div class="status-badge offline" id="statusBadge">BAĞLANTI BEKLENİYOR</div>
+    </div>
   </div>
 
   <!-- Main -->
@@ -260,7 +263,7 @@
     <!-- Video -->
     <div class="card video-card">
       <div class="card-header">
-        <span class="card-title">CANLI GORUNTU</span>
+        <span class="card-title">CANLI GÖRÜNTÜ</span>
         <span id="resolutionInfo" style="font-size:11px;color:#6b7280;">---</span>
       </div>
       <div class="live-badge" id="liveBadge">
@@ -273,7 +276,7 @@
           <polygon points="23 7 16 12 23 17 23 7"></polygon>
           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
         </svg>
-        <span style="font-size:12px;font-weight:600;">Arac secin ve izlemeye baslayin</span>
+        <span style="font-size:12px;font-weight:600;">Araç seçin ve izlemeye başlayın</span>
       </div>
     </div>
 
@@ -289,18 +292,18 @@
     <!-- Controls -->
     <div class="controls">
       <div class="control-group">
-        <label>ARAC</label>
-        <input type="text" id="vehicleInput" value="DXB-BYD-01" placeholder="Arac ID" />
+        <label>ARAÇ</label>
+        <input type="text" id="vehicleInput" value="vehicle-001" placeholder="Araç ID" />
       </div>
 
       <div class="control-group">
-        <label>AKTIF YAYINLAR</label>
+        <label>AKTİF YAYINLAR</label>
         <div class="streams-list" id="streamsList">
-          <span style="color:#6b7280;font-size:11px;">Yukleniyor...</span>
+          <span style="color:#6b7280;font-size:11px;">Yükleniyor...</span>
         </div>
       </div>
 
-      <button class="btn btn-primary" id="watchBtn" onclick="requestStream()">IZLEMEYE BASLA</button>
+      <button class="btn btn-primary" id="watchBtn" onclick="requestStream()">İZLEMEYE BAŞLA</button>
       <button class="btn btn-danger" id="stopBtn" onclick="stopWatching()" style="display:none;">DURDUR</button>
 
       <div class="info-bar">
@@ -309,11 +312,11 @@
           <span class="info-value" id="speedVal">--- km/h</span>
         </div>
         <div class="info-item">
-          <span class="info-label">YON</span>
+          <span class="info-label">YÖN</span>
           <span class="info-value" id="headingVal">---</span>
         </div>
         <div class="info-item">
-          <span class="info-label">SON GUNCELLEME</span>
+          <span class="info-label">SON GÜNCELLEME</span>
           <span class="info-value" id="lastUpdate">---</span>
         </div>
       </div>
@@ -321,7 +324,7 @@
 
     <!-- Log -->
     <div class="log-area" id="logArea">
-      <div class="log-line">Sistem baslatiliyor...</div>
+      <div class="log-line">Sistem başlatılıyor...</div>
     </div>
   </div>
 
@@ -429,8 +432,8 @@
     socket.on('connect', () => {
       connDot.classList.add('connected');
       statusBadge.className = 'status-badge online';
-      statusBadge.textContent = 'BAGLI';
-      addLog('Sunucuya baglandi');
+      statusBadge.textContent = 'BAĞLI';
+      addLog('Sunucuya bağlandı');
 
       // Request active streams list
       socket.emit('webrtc:stream-list');
@@ -439,8 +442,8 @@
     socket.on('disconnect', () => {
       connDot.classList.remove('connected');
       statusBadge.className = 'status-badge offline';
-      statusBadge.textContent = 'BAGLANTI KESILDI';
-      addLog('Baglanti kesildi');
+      statusBadge.textContent = 'BAĞLANTI KESİLDİ';
+      addLog('Bağlantı kesildi');
     });
 
     // Active streams list
@@ -451,7 +454,7 @@
     // Stream stopped notification
     socket.on('webrtc:stop-stream', (data) => {
       if (data.vehicleId === currentVehicleId) {
-        addLog(`Arac ${data.vehicleId} yayini durdurdu`);
+        addLog(`Araç ${data.vehicleId} yayını durdurdu`);
         stopWatching();
       }
     });
@@ -471,7 +474,7 @@
   // ==========================================
   function renderStreamsList(streams) {
     if (streams.length === 0) {
-      streamsList.innerHTML = '<span style="color:#6b7280;font-size:11px;">Aktif yayin yok</span>';
+      streamsList.innerHTML = '<span style="color:#6b7280;font-size:11px;">Aktif yayın yok</span>';
       return;
     }
 
@@ -499,17 +502,17 @@
     if (livekitRoom) stopWatching();
 
     currentVehicleId = vehicleId;
-    addLog(`Yayin istegi gonderiliyor: ${vehicleId}`);
+    addLog(`Yayın isteği gönderiliyor: ${vehicleId}`);
 
     // Subscribe to GPS data for this vehicle
     socket.emit('location:subscribe', { vehicleId });
 
     try {
       // 1. Fetch token from our Node.js Backend
-      addLog('LiveKit yetki bileti (token) aliniyor...');
-      const response = await fetch(`/api/v1/livekit/token?room=${currentVehicleId}&participant=${viewerId}&role=subscriber`);
+      addLog('LiveKit yetki bileti (token) alınıyor...');
+      const response = await fetch(`/livekit/token?room=${currentVehicleId}&participant=${viewerId}&role=subscriber`);
       if (!response.ok) {
-        throw new Error(`Token alinamadi: ${response.statusText}`);
+        throw new Error(`Token alınamadı: ${response.statusText}`);
       }
       
       const { token } = await response.json();
@@ -518,64 +521,77 @@
       livekitRoom = new LivekitClient.Room();
 
       livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-        addLog(`Kanal yakalandi: ${track.kind} | Etkin: ${!track.isMuted}`);
+        addLog(`Kanal yakalandı: ${track.kind} | Etkin: ${!track.isMuted}`);
         
         if (track.kind === LivekitClient.Track.Kind.Video) {
           // Attach track to our remoteVideo element
-          track.attach(remoteVideo);
+          const attachedEl = track.attach(remoteVideo);
+          addLog('Video track bağlandı, veri bekleniyor...');
           
+          // Show video element immediately
           remoteVideo.style.display = 'block';
           videoPlaceholder.style.display = 'none';
           liveBadge.style.display = 'flex';
 
-          // Try to play immediately (LiveKit attach usually handles this, but just in case)
-          const playPromise = remoteVideo.play();
-          if (playPromise !== undefined) {
-             playPromise.catch(error => {
-               addLog('Oynatma baslatilamadi: ' + error.message);
-               console.warn('Autoplay prevented:', error);
-               
-               // Show interactive overlay for user click requirement
-               videoPlaceholder.style.display = 'flex';
-               videoPlaceholder.style.cursor = 'pointer';
-               videoPlaceholder.innerHTML = '<i class="fas fa-play" style="font-size: 30px; margin-bottom: 10px;"></i><span>Yayini Baslatmak Icin Tiklayin</span>';
-               
-               videoPlaceholder.onclick = () => {
-                  remoteVideo.play();
-                  videoPlaceholder.style.display = 'none';
-                  addLog('Oynatma manuel tetiklendi');
-               };
-             });
-          }
-
-          remoteVideo.onloadedmetadata = () => {
-            addLog(`Yayin Ozellikleri: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
+          // Wait for video data to be ready before playing
+          remoteVideo.onloadeddata = () => {
+            addLog(`Video verisi hazır: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
             document.getElementById('resolutionInfo').textContent = `${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`;
+            
+            // Now safe to play
+            remoteVideo.play().then(() => {
+              addLog('Video oynatılıyor ✅');
+            }).catch(error => {
+              addLog('Otomatik oynatma engellendi: ' + error.message);
+              console.warn('Autoplay prevented:', error);
+              
+              // Show click-to-play overlay ON TOP of video, don't hide video
+              videoPlaceholder.style.display = 'flex';
+              videoPlaceholder.style.position = 'absolute';
+              videoPlaceholder.style.top = '0';
+              videoPlaceholder.style.left = '0';
+              videoPlaceholder.style.right = '0';
+              videoPlaceholder.style.bottom = '0';
+              videoPlaceholder.style.background = 'rgba(0,0,0,0.7)';
+              videoPlaceholder.style.cursor = 'pointer';
+              videoPlaceholder.style.zIndex = '5';
+              videoPlaceholder.innerHTML = '<span style="font-size:48px;">▶</span><span style="font-size:14px;font-weight:600;color:#fff;">Yayını Başlatmak İçin Tıklayın</span>';
+              
+              videoPlaceholder.onclick = () => {
+                remoteVideo.play();
+                videoPlaceholder.style.display = 'none';
+                addLog('Oynatma manuel tetiklendi ✅');
+              };
+            });
           };
 
-          addLog('Video ekrana basarili sekilde baglandi');
+          remoteVideo.onloadedmetadata = () => {
+            addLog(`Yayın Özellikleri: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
+          };
+
+          addLog('Video ekrana başarılı şekilde bağlandı');
         }
       });
 
       livekitRoom.on(LivekitClient.RoomEvent.Disconnected, () => {
-        addLog('LiveKit: Baglanti koptu');
+        addLog('LiveKit: Bağlantı koptu');
         stopWatching();
       });
 
       // 3. Connect to the LiveKit Server using the Token
-      addLog('LiveKit sunucusuna baglaniliyor...');
+      addLog('LiveKit sunucusuna bağlanılıyor...');
       const LIVEKIT_URL = 'wss://peng-cantak-3avcr64w.livekit.cloud';
       await livekitRoom.connect(LIVEKIT_URL, token, {
         autoSubscribe: true, // Automatically subscribe to tracks published by the vehicle
       });
 
-      addLog('LiveKit: Odaya basariyla baglanildi!');
+      addLog('LiveKit: Odaya başarıyla bağlanıldı!');
 
       watchBtn.style.display = 'none';
       stopBtn.style.display = 'inline-block';
 
     } catch (e) {
-      addLog(`Baglanti hatasi: ${e.message}`);
+      addLog(`Bağlantı hatası: ${e.message}`);
       console.error(e);
       stopWatching();
     }
@@ -608,7 +624,55 @@
     watchBtn.style.display = 'inline-block';
     stopBtn.style.display = 'none';
 
-    addLog('Izleme durduruldu');
+    addLog('İzleme durduruldu');
+  }
+
+  // ==========================================
+  // SIMULATION MODE (For Testing)
+  // ==========================================
+  let simInterval = null;
+  function toggleSimulation() {
+    if (simInterval) {
+      clearInterval(simInterval);
+      simInterval = null;
+      document.getElementById('simBtn').textContent = 'SİMÜLASYONU BAŞLAT';
+      document.getElementById('simBtn').style.color = '#888';
+      socket.emit('webrtc:stop-stream', { vehicleId: 'vehicle-001' });
+      addLog('Simülasyon durduruldu');
+    } else {
+      const vId = 'vehicle-001';
+      vehicleInput.value = vId;
+      document.getElementById('simBtn').textContent = 'SİMÜLASYONU DURDUR';
+      document.getElementById('simBtn').style.color = '#ef4444';
+      
+      addLog('Simülasyon başlatıldı (Araç: vehicle-001)');
+      
+      // 1. Tell server we are a streamer
+      socket.emit('webrtc:start-stream', { vehicleId: vId });
+      
+      // 2. Start sending fake GPS
+      let lat = 25.2048;
+      let lng = 55.2708;
+      simInterval = setInterval(() => {
+        lat += (Math.random() - 0.5) * 0.002;
+        lng += (Math.random() - 0.5) * 0.002;
+        const speed = Math.floor(Math.random() * 90);
+        const heading = Math.floor(Math.random() * 360);
+        
+        socket.emit('location:update', {
+          vehicleId: vId,
+          position: { lat, lng },
+          speed: speed / 3.6, // km/h to m/s
+          heading: heading,
+          recordedAt: new Date()
+        });
+      }, 2000);
+
+      // Connect as viewer automatically
+      setTimeout(() => {
+        requestStream();
+      }, 500);
+    }
   }
 
   // ==========================================
