@@ -9,6 +9,13 @@ async function bootstrap() {
   // Serve static files (viewer.html etc.)
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
+  // Enable CORS
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
+
   const port = process.env.PORT || 3005;
   await app.listen(port, '0.0.0.0');
   

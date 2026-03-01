@@ -51,11 +51,9 @@ export default function VehicleCard({ vehicle, isStreaming, onTrack, onLiveView 
         <TouchableOpacity style={styles.trackBtn} onPress={onTrack}>
           <Text style={styles.trackBtnText}>📍 Haritada Takip Et</Text>
         </TouchableOpacity>
-        {isStreaming && (
-          <TouchableOpacity style={styles.liveBtn} onPress={onLiveView}>
-            <Text style={styles.liveBtnText}>🎥 Canlı İzle</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={styles.liveBtn} onPress={onLiveView}>
+          <Text style={styles.liveBtnText}>🎥 Canlı İzle</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

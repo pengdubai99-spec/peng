@@ -21,6 +21,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <AdminSidebar lang={lang} />
 
         <main className="flex-1 flex flex-col relative z-10 min-w-0">
+          {/* Mock Data Banner */}
+          <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+            <span className="text-yellow-400 text-xs font-bold tracking-wider">DEMO DATA</span>
+            <span className="text-yellow-400/60 text-xs">Bu sayfadaki veriler demo amaçlıdır. Gerçek veriler API bağlantısı sonrası gelecektir.</span>
+          </div>
           {children}
         </main>
       </div>

@@ -15,9 +15,12 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import "leaflet/dist/leaflet.css";
-import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css";
-import "leaflet-defaulticon-compatibility";
+import * as LivekitClient from 'livekit-client';
+if (typeof window !== 'undefined') {
+  require("leaflet/dist/leaflet.css");
+  require("leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css");
+  require("leaflet-defaulticon-compatibility");
+}
 
 // Dynamic import for Leaflet (breaks in SSR)
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
@@ -27,10 +30,7 @@ const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ss
 
 // Tracking Service URL
 const TRACKING_URL = "http://localhost:3005";
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-];
+const LIVEKIT_URL = "wss://peng-cantak-3avcr64w.livekit.cloud";
 
 interface LiveTrackingProps {
   lang: string;
@@ -45,7 +45,7 @@ export default function LiveTracking({ lang }: LiveTrackingProps) {
   const [fatigueAlerts, setFatigueAlerts] = useState<Record<string, boolean>>({});
   
   const socketRef = useRef<Socket | null>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const livekitRoomRef = useRef<LivekitClient.Room | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const viewerId = useRef('viewer-' + Math.random().toString(36).substr(2, 9));
 
@@ -80,33 +80,6 @@ export default function LiveTracking({ lang }: LiveTrackingProps) {
       setActiveStreams(prev => prev.filter(id => id !== data.vehicleId));
     });
 
-    // 3. WebRTC Signaling Handlers
-    socketRef.current.on(`webrtc:offer:${viewerId.current}`, async (data: any) => {
-      if (!pcRef.current) return;
-      try {
-        await pcRef.current.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
-        const answer = await pcRef.current.createAnswer();
-        await pcRef.current.setLocalDescription(answer);
-        socketRef.current?.emit('webrtc:answer', {
-          vehicleId: data.vehicleId,
-          viewerId: viewerId.current,
-          sdp: answer.sdp,
-        });
-      } catch (e) {
-        console.error('WebRTC offer error:', e);
-      }
-    });
-
-    socketRef.current.on(`webrtc:ice-candidate:${viewerId.current}`, async (data: any) => {
-      if (pcRef.current && data.candidate) {
-        try {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {
-          console.error('ICE candidate error:', e);
-        }
-      }
-    });
-
     socketRef.current.on("ai:alert", (data: any) => {
       if (data.type === 'FATIGUE') {
         setFatigueAlerts(prev => ({ ...prev, [data.vehicleId]: true }));
@@ -121,42 +94,42 @@ export default function LiveTracking({ lang }: LiveTrackingProps) {
       stopWatching();
       socketRef.current?.disconnect();
     };
-  }, []);
+  }, [selectedVehicle]);
 
-  const requestStream = (vehicleId: string) => {
+  const requestStream = async (vehicleId: string) => {
     stopWatching();
     setSelectedVehicle(vehicleId);
     setIsWatching(true);
 
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    pcRef.current = pc;
+    try {
+      // 1. Fetch token
+      const response = await fetch(`${TRACKING_URL}/livekit/token?room=${vehicleId}&participant=${viewerId.current}&role=subscriber`);
+      if (!response.ok) throw new Error('Token alinamadi');
+      const { token } = await response.json();
 
-    pc.ontrack = (event) => {
-      if (videoRef.current) {
-        videoRef.current.srcObject = event.streams[0];
-      }
-    };
+      // 2. Initialize Room
+      const room = new LivekitClient.Room();
+      livekitRoomRef.current = room;
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socketRef.current?.emit('webrtc:ice-candidate', {
-          vehicleId,
-          viewerId: viewerId.current,
-          candidate: event.candidate.toJSON(),
-        });
-      }
-    };
+      room.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === LivekitClient.Track.Kind.Video && videoRef.current) {
+          track.attach(videoRef.current);
+        }
+      });
 
-    socketRef.current?.emit('webrtc:request-stream', {
-      vehicleId,
-      viewerId: viewerId.current,
-    });
+      // 3. Connect
+      await room.connect(LIVEKIT_URL, token, { autoSubscribe: true });
+
+    } catch (err) {
+      console.error('LiveKit connection error:', err);
+      setIsWatching(false);
+    }
   };
 
   const stopWatching = () => {
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
+    if (livekitRoomRef.current) {
+      livekitRoomRef.current.disconnect();
+      livekitRoomRef.current = null;
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Car,
@@ -23,6 +23,14 @@ import {
 import { translations, Language } from "../../../lib/i18n";
 
 export default function PartnerDashboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#050510] flex items-center justify-center"><div className="text-white">Loading...</div></div>}>
+      <PartnerDashboardContent />
+    </Suspense>
+  );
+}
+
+function PartnerDashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);

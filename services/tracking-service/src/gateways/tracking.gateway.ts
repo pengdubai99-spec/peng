@@ -34,6 +34,27 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
+    
+    // Clean up if this was a streamer
+    let disconnectedVehicleId: string | null = null;
+    for (const [vId, sId] of this.activeStreamers.entries()) {
+      if (sId === client.id) {
+        disconnectedVehicleId = vId;
+        break;
+      }
+    }
+
+    if (disconnectedVehicleId) {
+      this.activeStreamers.delete(disconnectedVehicleId);
+      console.log(`🔴 Streamer disconnected: ${disconnectedVehicleId}`);
+      this.broadcastStreamList();
+    }
+  }
+
+  private broadcastStreamList() {
+    this.server.emit(SocketEvents.WEBRTC_STREAM_LIST, {
+      activeStreams: Array.from(this.activeStreamers.keys()),
+    });
   }
 
   // ==========================================
@@ -91,5 +112,36 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     console.log(`⚠️ AI Alert Simulated: ${data.vehicleId} - ${data.type}`);
     // Broadcast to all clients (dashboards)
     this.server.emit('ai:alert', data);
+  }
+
+  // ==========================================
+  // LiveKit Stream Management (Socket-side)
+  // ==========================================
+
+  @SubscribeMessage(SocketEvents.WEBRTC_START_STREAM)
+  handleStartStream(
+    @MessageBody() data: { vehicleId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    console.log(`🟢 [LIVE] Vehicle ${data.vehicleId} started streaming on LiveKit`);
+    this.activeStreamers.set(data.vehicleId, client.id);
+    this.broadcastStreamList();
+  }
+
+  @SubscribeMessage(SocketEvents.WEBRTC_STOP_STREAM)
+  handleStopStream(
+    @MessageBody() data: { vehicleId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    console.log(`🔴 [STOP] Vehicle ${data.vehicleId} stopped streaming`);
+    this.activeStreamers.delete(data.vehicleId);
+    this.broadcastStreamList();
+  }
+
+  @SubscribeMessage(SocketEvents.WEBRTC_STREAM_LIST)
+  handleGetStreamList(@ConnectedSocket() client: Socket) {
+    client.emit(SocketEvents.WEBRTC_STREAM_LIST, {
+      activeStreams: Array.from(this.activeStreamers.keys()),
+    });
   }
 }
