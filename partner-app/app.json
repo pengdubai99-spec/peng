@@ -40,7 +40,6 @@
       ]
     },
     "plugins": [
-      "./plugins/withWebRTC",
       "expo-asset"
     ],
     "extra": {

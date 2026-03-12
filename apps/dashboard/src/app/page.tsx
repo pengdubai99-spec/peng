@@ -1,49 +1,45 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-  Navigation,
   Video,
   BrainCircuit,
   Shield,
   MapPin,
-  Activity,
   ArrowRight,
-  Sparkles,
-  Languages,
+  Play,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Language, translations } from "../lib/i18n";
 
-/* ===== FLOATING PARTICLES ===== */
+/* ===== FLOATING PARTICLES (Green) ===== */
 function Particles() {
-  const [particles, setParticles] = useState<Array<{left: string; top: string; delay: string; dur: string; w: string; bg: string}>>([]);
+  const [particles, setParticles] = useState<Array<{left: string; top: string; delay: string; dur: string; w: string; bg: string; blur: string}>>([]);
   useEffect(() => {
     const colors = [
-      "rgba(99, 102, 241, 0.4)",
-      "rgba(168, 85, 247, 0.4)",
-      "rgba(236, 72, 153, 0.3)",
-      "rgba(6, 182, 212, 0.4)",
+      "rgba(34, 197, 94, 0.4)",
+      "rgba(74, 222, 128, 0.3)",
+      "rgba(22, 163, 74, 0.5)",
     ];
     setParticles(
-      Array.from({ length: 20 }).map(() => ({
+      Array.from({ length: 30 }).map(() => ({
         left: `${Math.random() * 100}%`,
         top: `${Math.random() * 100}%`,
-        delay: `${Math.random() * 8}s`,
-        dur: `${6 + Math.random() * 6}s`,
-        w: `${2 + Math.random() * 3}px`,
-        bg: colors[Math.floor(Math.random() * 4)],
+        delay: `${Math.random() * 5}s`,
+        dur: `${15 + Math.random() * 15}s`,
+        w: `${1 + Math.random() * 2}px`,
+        bg: colors[Math.floor(Math.random() * 3)],
+        blur: `${Math.random() * 2}px`,
       }))
     );
   }, []);
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-0">
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
       {particles.map((p, i) => (
         <div
           key={i}
-          className="particle"
+          className="absolute rounded-full"
           style={{
             left: p.left,
             top: p.top,
@@ -52,275 +48,177 @@ function Particles() {
             width: p.w,
             height: p.w,
             background: p.bg,
+            boxShadow: `0 0 10px ${p.bg}`,
+            filter: `blur(${p.blur})`,
+            animation: 'particleFloat 20s ease-in-out infinite'
           }}
         />
       ))}
+      <style jsx>{`
+        @keyframes particleFloat {
+          0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }
 
 /* ===== MAIN PAGE ===== */
 export default function LandingPage() {
-  const [lang, setLang] = useState<Language>('en');
-  const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
-  const t = translations[lang];
-  const isRtl = lang === 'ar';
-
   const features = [
-    { icon: Navigation, label: t.gpsTitle, desc: t.gpsDesc, color: "from-indigo-500 to-blue-500" },
-    { icon: Video, label: t.camTitle, desc: t.camDesc, color: "from-purple-500 to-violet-500" },
-    { icon: BrainCircuit, label: t.aiTitle, desc: t.aiDesc, color: "from-pink-500 to-rose-500" },
-    { icon: Shield, label: t.shieldTitle, desc: t.shieldDesc, color: "from-cyan-500 to-teal-500" },
+    { 
+      icon: MapPin, 
+      label: "Canlı GPS Takip", 
+      desc: "Araç konumlarini gercek zamanli izleyin. Rota gecmisi ve harita entegrasyonu ile tam kontrol." 
+    },
+    { 
+      icon: Video, 
+      label: "Akıllı Kamera", 
+      desc: "HD canli yayin, otomatik goruntu kaydi ve bulut depolama ile 7/24 guvenlik." 
+    },
+    { 
+      icon: BrainCircuit, 
+      label: "AI Anomali Tespiti", 
+      desc: "Yapay zeka ile olagandisi davranis algilama, anlik uyarilar ve detayli raporlama." 
+    },
+    { 
+      icon: Shield, 
+      label: "Güvenlik Kalkanı", 
+      desc: "Panik butonu, SOS bildirimi ve uctan uca sifreli veri iletimi ile tam koruma." 
+    },
   ];
 
   return (
-    <div className={isRtl ? 'font-["IBM_Plex_Sans_Arabic"]' : ''} dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-[#22c55e]/30 overflow-hidden font-sans">
       {/* Background Effects */}
-      <div className="bg-mesh" />
-      <div className="grid-pattern" />
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        {/* Faint green grid lines */}
+        <div 
+          className="absolute inset-0 opacity-20" 
+          style={{
+            backgroundImage: `linear-gradient(rgba(34, 197, 94, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 197, 94, 0.1) 1px, transparent 1px)`,
+            backgroundSize: '100px 100px',
+            backgroundPosition: 'center 0',
+            maskImage: 'radial-gradient(ellipse at top, black 0%, transparent 70%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at top, black 0%, transparent 70%)'
+          }}
+        />
+        {/* Top central green glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-[#22c55e]/5 rounded-full blur-[120px]" />
+      </div>
+
       <Particles />
 
-      {/* Navigation */}
-      <motion.nav
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="nav-blur fixed top-0 left-0 right-0 z-50 px-6 py-4"
-      >
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <motion.div
-            className="flex items-center gap-3"
-            whileHover={{ scale: 1.02 }}
-          >
-            <div className="relative">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-20 blur-md -z-10" />
-            </div>
-            <span className="text-xl font-bold tracking-tight gradient-text-peng">
-              {t.title}
-            </span>
-          </motion.div>
-
-          <div className="hidden md:flex items-center gap-8">
-            <div className="flex items-center gap-4 border-e border-white/10 pe-8">
-              {[
-                { code: 'en', label: 'EN' },
-                { code: 'tr', label: 'TR' },
-                { code: 'ar', label: 'عربي' },
-              ].map((l) => (
-                <button
-                  key={l.code}
-                  onClick={() => setLang(l.code as Language)}
-                  className={`text-xs font-bold transition-all ${lang === l.code ? 'text-indigo-400 bg-indigo-400/10 px-2 py-1 rounded' : 'text-slate-500 hover:text-white'}`}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
-
-            {[t.features, t.about, t.contact].map((item) => (
-              <motion.a
-                key={item}
-                href="#"
-                className="text-sm text-slate-400 hover:text-white transition-colors relative"
-                whileHover={{ y: -1 }}
-              >
-                {item}
-              </motion.a>
-            ))}
-            <Link href="/login">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-5 py-2 text-sm font-medium rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-              >
-                {t.login}
-              </motion.button>
-            </Link>
-          </div>
-        </div>
-      </motion.nav>
-
-      {/* Hero Section */}
-      <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6 pt-24 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="max-w-5xl mx-auto"
-        >
-          {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.06] mb-8"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs text-slate-400 font-medium tracking-wide">
-              {t.badge}
-            </span>
-            <Sparkles className="w-3 h-3 text-purple-400" />
-          </motion.div>
-
-          {/* Title */}
+      <main className="relative z-10 max-w-[900px] mx-auto px-6 pt-32 pb-16 flex flex-col items-center">
+        {/* Hero Section */}
+        <section className="flex flex-col items-center justify-center text-center mb-20 w-full">
           <motion.h1
-            className="text-7xl md:text-9xl font-black tracking-tighter leading-none mb-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8 }}
+            className="text-[120px] font-black tracking-tight leading-none mb-6 relative"
+            style={{
+              color: 'transparent',
+              WebkitTextStroke: '3px #22c55e',
+              textShadow: '0 0 40px rgba(34, 197, 94, 0.4), 0 0 80px rgba(34, 197, 94, 0.1)',
+            }}
           >
-            <span className="gradient-text-peng">{t.title}</span>
+            PENG
           </motion.h1>
 
-          {/* Subtitle */}
           <motion.p
-            className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed mb-4"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.8 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="text-[#999999] max-w-[600px] text-[15px] leading-relaxed mb-10 font-medium"
           >
-            {t.subtitle}
+            Akıllı filo yönetiminin geleceği. Yapay zeka destekli GPS takip, canlı kamera izleme ve anomali tespiti ile filonuzu tek platformdan yönetin.
           </motion.p>
 
-          <motion.p
-            className="text-sm md:text-base text-slate-500 max-w-xl mx-auto leading-relaxed mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
-          >
-            {t.description}
-          </motion.p>
-
-          {/* CTA Buttons */}
           <motion.div
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1, duration: 0.8 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="flex items-center gap-4"
           >
             <Link href="/login">
-              <motion.button
-                whileHover={{ scale: 1.04, y: -2 }}
-                whileTap={{ scale: 0.96 }}
-                className="cta-button px-8 py-4 text-white font-semibold rounded-2xl flex items-center gap-3 text-base shadow-2xl shadow-purple-500/20"
-              >
-                <span>{t.start}</span>
-                <ArrowRight className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} />
-              </motion.button>
+              <button className="bg-[#22c55e] hover:bg-[#1ea950] text-black font-semibold px-8 py-3.5 rounded-2xl flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+                <span className="text-[15px]">Başla</span>
+                <ArrowRight className="w-5 h-5 ml-1" />
+              </button>
             </Link>
-
-            <motion.button
-              whileHover={{ scale: 1.04, y: -2 }}
-              whileTap={{ scale: 0.96 }}
-              className="px-8 py-4 text-slate-300 font-medium rounded-2xl border border-white/10 hover:bg-white/5 transition-all flex items-center gap-3 text-base"
-            >
-              <Activity className="w-4 h-4" />
-              <span>{t.demo}</span>
-            </motion.button>
+            <button className="bg-[#111111]/80 hover:bg-[#1a1a1a] border border-[#333] text-white font-medium px-8 py-3.5 rounded-2xl flex items-center gap-3 transition-all backdrop-blur-sm">
+              <div className="w-5 h-5 flex items-center justify-center">
+                <Play className="w-4 h-4 fill-white text-white" />
+              </div>
+              <span className="text-[15px]">Canlı Demo</span>
+            </button>
           </motion.div>
-        </motion.div>
+        </section>
 
         {/* Features Section */}
-        <motion.div
-          className="max-w-6xl mx-auto mt-32 w-full px-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2, duration: 0.8 }}
-        >
-          <motion.div className="text-center mb-16">
-            <motion.span
-              className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400 mb-4 block"
-            >
-              {t.features}
-            </motion.span>
-            <motion.h2
-              className="text-3xl md:text-5xl font-bold text-white"
-            >
-              {t.featureTitle.split('One Platform')[0]}
-              <span className="gradient-text-peng">One Platform</span>
-              {t.featureTitle.split('One Platform')[1]}
-            </motion.h2>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-start">
+        <section className="w-full mb-16">
+          <h2 className="text-2xl font-bold mb-6 text-white tracking-wide">Özellikler</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {features.map((feature, i) => (
               <motion.div
                 key={i}
-                className="glass-card rounded-3xl p-8 relative overflow-hidden group cursor-pointer"
-                onHoverStart={() => setHoveredFeature(i)}
-                onHoverEnd={() => setHoveredFeature(null)}
-                whileHover={{ scale: 1.01 }}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1, duration: 0.5 }}
+                viewport={{ once: true }}
+                className="bg-[#111111] border border-[#222] hover:border-[#22c55e]/40 rounded-3xl p-6 group transition-all duration-300 cursor-pointer"
               >
-                <div className="relative z-10 flex flex-col gap-5">
-                  <div className={`p-3 rounded-2xl bg-gradient-to-br ${feature.color} shadow-lg w-fit`}>
-                    <feature.icon className="w-6 h-6 text-white" />
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 rounded-[14px] bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center group-hover:bg-[#22c55e]/10 group-hover:border-[#22c55e]/30 transition-all duration-300">
+                      <feature.icon className="w-6 h-6 text-[#22c55e]" />
+                    </div>
                   </div>
-
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-purple-200 transition-all duration-300">
-                      {feature.label}
-                    </h3>
-                    <p className="text-sm text-slate-400 leading-relaxed">
+                  <div className="flex flex-col flex-grow">
+                    <h3 className="text-base font-bold mb-2 text-white group-hover:text-[#22c55e] transition-colors duration-300">{feature.label}</h3>
+                    <p className="text-[#888888] text-[13px] leading-relaxed mb-6">
                       {feature.desc}
                     </p>
+                    <div className="flex items-center gap-2 text-[12px] font-semibold text-[#555] mt-auto uppercase tracking-wide group-hover:text-white transition-colors duration-300">
+                      Detayları gör
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:text-[#22c55e] transition-colors" />
+                    </div>
                   </div>
-
-                  <motion.div
-                    className="flex items-center gap-2 text-xs text-slate-500 group-hover:text-purple-400 transition-colors"
-                  >
-                    <span>{t.details}</span>
-                    <motion.div
-                      animate={hoveredFeature === i ? { x: isRtl ? -4 : 4 } : { x: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <ArrowRight className={`w-3 h-3 ${isRtl ? 'rotate-180' : ''}`} />
-                    </motion.div>
-                  </motion.div>
                 </div>
               </motion.div>
             ))}
           </div>
-        </motion.div>
+        </section>
 
-        {/* Bottom CTA */}
-        <motion.div
-          className="max-w-4xl mx-auto mt-32 mb-24 w-full px-4 text-center"
-        >
-          <div className="glass-card rounded-3xl p-12 md:p-16 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5" />
-            <div className="relative z-10">
-              <MapPin className="w-8 h-8 text-purple-400 mx-auto mb-6" />
-              <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                {t.heroAction}
-              </h3>
-              <p className="text-slate-400 max-w-lg mx-auto mb-8">
-                {t.heroDesc}
+        {/* CTA Bottom */}
+        <section className="w-full mb-20">
+          <div className="bg-[#111111] border border-[#222] rounded-3xl p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="text-center md:text-left">
+              <h3 className="text-[17px] font-bold mb-1 text-white">PENG ile tanışın.</h3>
+              <p className="text-[#888888] text-[14px]">
+                Kurulum gerektirmez, dakikalar içinde başlayın.
               </p>
+            </div>
+            <div className="flex-shrink-0">
               <Link href="/login">
-                <motion.button
-                  whileHover={{ scale: 1.04, y: -2 }}
-                  whileTap={{ scale: 0.96 }}
-                  className="cta-button px-10 py-4 text-white font-semibold rounded-2xl inline-flex items-center gap-3 text-base shadow-2xl shadow-purple-500/20"
-                >
-                  <span>{t.heroTitle}</span>
-                  <ArrowRight className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} />
-                </motion.button>
+                <button className="bg-[#22c55e] hover:bg-[#1ea950] text-black font-semibold px-6 py-2.5 rounded-xl text-[14px] transition-all shadow-[0_0_15px_rgba(34,197,94,0.2)]">
+                  Hemen Dene
+                </button>
               </Link>
             </div>
           </div>
-        </motion.div>
+        </section>
 
         {/* Footer */}
-        <motion.footer
-          className="w-full border-t border-white/[0.04] py-8 text-center"
-        >
-          <p className="text-xs text-slate-600">
-            &copy; 2026 {t.title}. {t.footer}
+        <footer className="w-full text-center pb-8">
+          <p className="text-[#444] text-[13px] font-medium tracking-wide">
+            © 2022 Rok-PENG. Tüm hakları saklıdır.
           </p>
-        </motion.footer>
+        </footer>
       </main>
     </div>
   );

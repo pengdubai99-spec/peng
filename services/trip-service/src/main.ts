@@ -18,7 +18,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  const port = process.env.PORT || 3002;
+  const port = process.env.TRIP_SERVICE_PORT || 3002;
   await app.listen(port);
   console.log(`🚗 Trip Service running on http://localhost:${port}`);
 }
