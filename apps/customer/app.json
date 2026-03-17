@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "PENG",
+    "slug": "peng-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050510"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.peng.customer",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "PENG, yolculuğunuz sırasında konumunuzu kullanır.",
+        "NSLocationAlwaysUsageDescription": "PENG, arka planda konumunuzu takip eder."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#050510"
+      },
+      "package": "com.peng.customer",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "PENG yolculuğunuz için konumunuza erişim gerektirir."
+        }
+      ]
+    ]
+  }
+}

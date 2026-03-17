@@ -9,10 +9,13 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment
+# Environment - .env.production deploy referansı için takip ediliyor
+# İçindeki gerçek değerleri Railway/Vercel dashboard'dan set edin!
 .env
 .env.local
 .env.*.local
+google-services.json
+GoogleService-Info.plist
 
 # IDE
 .vscode/

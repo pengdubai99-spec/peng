@@ -1,0 +1,37 @@
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_AUTH_URL": "https://peng-auth.railway.app",
+        "EXPO_PUBLIC_TRIP_URL": "https://peng-trip.railway.app",
+        "EXPO_PUBLIC_TRACKING_URL": "https://peng-tracking.railway.app"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_AUTH_URL": "https://peng-auth.railway.app",
+        "EXPO_PUBLIC_TRIP_URL": "https://peng-trip.railway.app",
+        "EXPO_PUBLIC_TRACKING_URL": "https://peng-tracking.railway.app"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-services.json",
+        "track": "production"
+      }
+    }
+  }
+}
