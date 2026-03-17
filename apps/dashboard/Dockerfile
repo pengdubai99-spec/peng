@@ -14,7 +14,7 @@ COPY packages/*/package.json ./packages/*/
 COPY apps/dashboard/package.json ./apps/dashboard/
 
 # Yalnızca Dashboard'un bağımlı olduğu paketleri kur
-RUN pnpm install --frozen-lockfile --filter=@saferide/dashboard...
+RUN pnpm install --no-frozen-lockfile --filter=@saferide/dashboard...
 
 # ==========================================
 # Build
