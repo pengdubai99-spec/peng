@@ -10,7 +10,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isRtl = lang === 'ar';
 
   return (
-    <LangContext.Provider value={{ lang, setLang, isRtl }}>
+    <LangContext value={{ lang, setLang, isRtl }}>
       <div className={`flex min-h-screen bg-[#050510] text-[#f0f0ff] font-['Outfit'] ${isRtl ? "font-['IBM_Plex_Sans_Arabic'] flex-row-reverse" : ''}`} dir={isRtl ? 'rtl' : 'ltr'}>
         {/* Background Effects */}
         <div className="fixed inset-0 pointer-events-none">
@@ -30,6 +30,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </main>
       </div>
-    </LangContext.Provider>
+    </LangContext>
   );
 }
