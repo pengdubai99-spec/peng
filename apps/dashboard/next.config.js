@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Standalone output - Railway/Docker için
-  output: process.env.DOCKER_BUILD === 'true' ? 'standalone' : undefined,
+  // Standalone output - Railway/Docker için (her zaman aktif)
+  output: 'standalone',
 
   // Environment variables (public - client'ta erişilebilir)
   env: {
