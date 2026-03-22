@@ -1,23 +1,39 @@
 'use client';
 
-import { useStore } from '@/lib/store';
+import { useState, useEffect } from 'react';
+import { useStore, apiGetHistory } from '@/lib/store';
 import { Glow, Card, Pill, NavBar } from '../Layout';
-
-const mockHistory = [
-  { id: '1', date: '17 Mar 2026, 14:30', driver: 'Ahmed Mansoor', from: 'Kadıköy', to: 'Levent', status: 'COMPLETED', fare: 78, duration: '42 dk', rating: 5 },
-  { id: '2', date: '15 Mar 2026, 09:15', driver: 'Omar Hassan', from: 'Beşiktaş', to: 'Maslak', status: 'COMPLETED', fare: 95, duration: '38 dk', rating: 4 },
-  { id: '3', date: '12 Mar 2026, 20:00', driver: 'Khalid Al-Rashid', from: 'Şişli', to: 'Ataşehir', status: 'COMPLETED', fare: 120, duration: '55 dk', rating: 5 },
-  { id: '4', date: '8 Mar 2026, 11:45', driver: 'Ahmed Mansoor', from: 'Üsküdar', to: 'Taksim', status: 'CANCELLED', fare: 0, duration: '-' },
-  { id: '5', date: '5 Mar 2026, 17:20', driver: 'Omar Hassan', from: 'Sarıyer', to: 'Bağcılar', status: 'COMPLETED', fare: 145, duration: '68 dk', rating: 4 },
-];
 
 const statusColors: Record<string, string> = { COMPLETED: '#22C55E', CANCELLED: '#EF4444', PENDING: '#F59E0B', ACTIVE: '#818CF8' };
 const statusLabels: Record<string, string> = { COMPLETED: 'Tamamlandı', CANCELLED: 'İptal', PENDING: 'Bekliyor', ACTIVE: 'Devam Ediyor' };
 
+interface TripHistory {
+  id: string;
+  status: string;
+  startAddress: string;
+  endAddress?: string;
+  fare?: number;
+  startedAt?: string;
+  endedAt?: string;
+  driverName: string;
+  vehicle?: string;
+  plate?: string;
+  myRating?: number;
+}
+
 export default function HistoryPage() {
-  const { setPage } = useStore();
-  const totalSpent = mockHistory.filter(t => t.status === 'COMPLETED').reduce((a, t) => a + t.fare, 0);
-  const completedCount = mockHistory.filter(t => t.status === 'COMPLETED').length;
+  const { token } = useStore();
+  const [history, setHistory] = useState<TripHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiGetHistory(token).then((trips: TripHistory[]) => {
+      setHistory(trips);
+    }).finally(() => setLoading(false));
+  }, [token]);
+
+  const totalSpent = history.filter(t => t.status === 'COMPLETED').reduce((a, t) => a + (t.fare || 0), 0);
+  const completedCount = history.filter(t => t.status === 'COMPLETED').length;
 
   return (
     <div style={{ minHeight: '100vh', background: '#050510', paddingBottom: 90 }}>
@@ -48,14 +64,22 @@ export default function HistoryPage() {
         </div>
 
         {/* Liste */}
+        {loading && (
+          <div style={{ textAlign: 'center', color: '#6B7280', padding: 40, fontSize: 14 }}>Yükleniyor...</div>
+        )}
+        {!loading && history.length === 0 && (
+          <div style={{ textAlign: 'center', color: '#6B7280', padding: 40, fontSize: 14 }}>Henüz yolculuk geçmişiniz yok.</div>
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {mockHistory.map(trip => (
+          {history.map(trip => (
             <Card key={trip.id} style={{ padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ color: '#6B7280', fontSize: 12 }}>{trip.date}</span>
+                <span style={{ color: '#6B7280', fontSize: 12 }}>
+                  {trip.startedAt ? new Date(trip.startedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                </span>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {trip.rating && <Pill label={`★ ${trip.rating}`} color="#F59E0B" />}
-                  <Pill label={statusLabels[trip.status]} color={statusColors[trip.status]} />
+                  {trip.myRating && <Pill label={`★ ${trip.myRating}`} color="#F59E0B" />}
+                  <Pill label={statusLabels[trip.status] || trip.status} color={statusColors[trip.status] || '#6B7280'} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -65,18 +89,18 @@ export default function HistoryPage() {
                   <div style={{ width: 8, height: 8, borderRadius: 2, background: '#6366F1' }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{trip.from}</div>
+                  <div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{trip.startAddress}</div>
                   <div style={{ height: 1, background: '#1A1A2E', margin: '6px 0' }} />
-                  <div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{trip.to}</div>
+                  <div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{trip.endAddress || '—'}</div>
                 </div>
               </div>
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
                 marginTop: 12, paddingTop: 10, borderTop: '1px solid #1A1A2E',
               }}>
-                <span style={{ color: '#6B7280', fontSize: 12 }}>🧑‍💼 {trip.driver}</span>
-                <span style={{ color: '#6B7280', fontSize: 12 }}>⏱ {trip.duration}</span>
-                {trip.fare > 0 && <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>₺{trip.fare}</span>}
+                <span style={{ color: '#6B7280', fontSize: 12 }}>🧑‍💼 {trip.driverName}</span>
+                <span style={{ color: '#6B7280', fontSize: 12 }}>{trip.vehicle}</span>
+                {(trip.fare ?? 0) > 0 && <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>₺{trip.fare}</span>}
               </div>
             </Card>
           ))}

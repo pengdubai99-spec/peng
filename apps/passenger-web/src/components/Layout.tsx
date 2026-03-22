@@ -43,8 +43,7 @@ export function Avatar({ initials, size = 44, bg = '#6366F1' }: { initials: stri
 }
 
 export function NavBar() {
-  const { page, setPage, user } = useStore();
-  const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'U';
+  const { page, setPage } = useStore();
 
   const navItems = [
     { id: 'home', icon: '🏠', label: 'Ana Sayfa' },
@@ -80,9 +79,15 @@ export function NavBar() {
   );
 }
 
-export function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+export function Card({ children, style, onClick, onMouseEnter, onMouseLeave }: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  onClick?: () => void;
+  onMouseEnter?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onMouseLeave?: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) {
   return (
-    <div style={{
+    <div onClick={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} style={{
       background: '#0D0D1A', borderRadius: 18,
       border: '1px solid #1A1A2E',
       ...style,

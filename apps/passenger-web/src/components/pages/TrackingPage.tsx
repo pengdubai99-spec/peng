@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useStore } from '@/lib/store';
-import { Glow, Card, Avatar, Pill } from '../Layout';
+import { useStore, apiCompleteTrip, apiRateTrip } from '@/lib/store';
+import { Glow, Card, Avatar } from '../Layout';
 
 type Status = 'waiting' | 'onway' | 'arrived' | 'inride' | 'completed';
 
 export default function TrackingPage() {
-  const { selectedDriver, destination, setPage, setSelectedDriver } = useStore();
+  const { selectedDriver, destination, setPage, setSelectedDriver, activeTrip, token, setActiveTrip } = useStore();
   const [status, setStatus] = useState<Status>('waiting');
   const [elapsed, setElapsed] = useState(0);
   const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
   const [showRate, setShowRate] = useState(false);
 
   useEffect(() => {
@@ -41,14 +42,21 @@ export default function TrackingPage() {
 
   const info = statusInfo[status];
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
     setStatus('completed');
+    if (activeTrip && !activeTrip.demo) {
+      await apiCompleteTrip(token, activeTrip.id).catch(() => {});
+    }
     setTimeout(() => setShowRate(true), 500);
   };
 
-  const handleRate = () => {
+  const handleRate = async () => {
+    if (activeTrip && !activeTrip.demo && rating > 0) {
+      await apiRateTrip(token, activeTrip.id, rating, comment || undefined).catch(() => {});
+    }
     setShowRate(false);
     setSelectedDriver(null);
+    setActiveTrip(null);
     setPage('home');
   };
 
@@ -211,6 +219,16 @@ export default function TrackingPage() {
                 }}>★</button>
               ))}
             </div>
+            <textarea
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="Yorum ekleyin (isteğe bağlı)"
+              style={{
+                width: '100%', background: '#0D0D1A', border: '1px solid #1A1A2E',
+                borderRadius: 10, color: '#fff', fontSize: 13, padding: '10px 14px',
+                resize: 'none', height: 70, marginBottom: 16, boxSizing: 'border-box',
+              }}
+            />
             <button className="btn-primary" onClick={handleRate} style={{ width: '100%', fontSize: 15 }}>
               Değerlendirmeyi Gönder →
             </button>

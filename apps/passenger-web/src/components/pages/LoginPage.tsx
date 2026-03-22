@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useStore } from '@/lib/store';
+import { useStore, apiLogin } from '@/lib/store';
 import { Glow, PengLogo, Card } from '../Layout';
 
 export default function LoginPage() {
@@ -17,24 +17,12 @@ export default function LoginPage() {
     if (!email || !password) { setError('E-posta ve şifre gerekli.'); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_AUTH_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = await apiLogin(email.trim(), password);
       setToken(data.token);
       setUser({ id: data.user.id, name: data.user.name, email: data.user.email, phone: data.user.phone });
       setPage('home');
-    } catch {
-      if (email === 'demo@peng.ae' && password === 'demo') {
-        setToken('demo-token');
-        setUser({ id: 'demo', name: 'Demo Kullanıcı', email: 'demo@peng.ae' });
-        setPage('home');
-      } else {
-        setError('E-posta veya şifre hatalı. Demo: demo@peng.ae / demo');
-      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'E-posta veya şifre hatalı.');
     } finally {
       setLoading(false);
     }

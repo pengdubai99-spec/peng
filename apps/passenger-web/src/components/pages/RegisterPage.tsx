@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useStore } from '@/lib/store';
-import { Glow, PengLogo, Card } from '../Layout';
+import { useStore, apiRegister } from '@/lib/store';
+import { Glow, Card } from '../Layout';
 
 export default function RegisterPage() {
   const { setPage, setUser, setToken } = useStore();
@@ -18,18 +18,14 @@ export default function RegisterPage() {
     if (!form.name || !form.email || !form.password) { setError('Ad, e-posta ve şifre zorunludur.'); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_AUTH_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, role: 'PASSENGER' }),
-      });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.message || 'Hata'); }
-      const data = await res.json();
+      const [firstName, ...rest] = form.name.trim().split(' ');
+      const lastName = rest.join(' ') || firstName;
+      const data = await apiRegister({ firstName, lastName, email: form.email, phone: form.phone || '0000', password: form.password });
       setToken(data.token);
       setUser({ id: data.user.id, name: data.user.name, email: data.user.email, phone: data.user.phone });
       setPage('home');
-    } catch (e: any) {
-      setError(e.message || 'Kayıt başarısız. Lütfen tekrar deneyin.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Kayıt başarısız. Lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
     }

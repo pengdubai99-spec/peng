@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PASSENGER
+  DRIVER
+  FLEET_MANAGER
+  ADMIN
+}
+
+enum DriverStatus {
+  ONLINE
+  OFFLINE
+  ON_TRIP
+  BREAK
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum TripStatus {
+  REQUESTED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  phone        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(PASSENGER)
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  avatarUrl    String?  @map("avatar_url")
+  isVerified   Boolean  @default(false) @map("is_verified")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  driver         Driver?
+  passengerTrips Trip[]   @relation("PassengerTrips")
+  ratingsGiven   Rating[] @relation("RatingsGiven")
+  ratingsReceived Rating[] @relation("RatingsReceived")
+
+  @@map("users")
+}
+
+model Vehicle {
+  id           String        @id @default(uuid())
+  plateNumber  String        @unique @map("plate_number")
+  brand        String
+  model        String
+  year         Int
+  deviceSerial String        @unique @map("device_serial")
+  status       VehicleStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  driver Driver?
+  trips  Trip[]
+
+  @@map("vehicles")
+}
+
+model Driver {
+  id        String       @id @default(uuid())
+  userId    String       @unique @map("user_id")
+  vehicleId String?      @unique @map("vehicle_id")
+  status    DriverStatus @default(OFFLINE)
+  rating    Float        @default(5.0)
+  totalTrips Int         @default(0) @map("total_trips")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id])
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id])
+  trips   Trip[]
+
+  @@map("drivers")
+}
+
+model Trip {
+  id           String     @id @default(uuid())
+  passengerId  String     @map("passenger_id")
+  driverId     String     @map("driver_id")
+  vehicleId    String     @map("vehicle_id")
+  startAddress String     @map("start_address")
+  endAddress   String?    @map("end_address")
+  startedAt    DateTime   @default(now()) @map("started_at")
+  endedAt      DateTime?  @map("ended_at")
+  status       TripStatus @default(REQUESTED)
+  fare         Decimal?
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  passenger User     @relation("PassengerTrips", fields: [passengerId], references: [id])
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  ratings   Rating[]
+
+  @@map("trips")
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  tripId    String   @map("trip_id")
+  ratedBy   String   @map("rated_by")
+  ratedUser String   @map("rated_user")
+  score     Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  trip     Trip @relation(fields: [tripId], references: [id])
+  rater    User @relation("RatingsGiven", fields: [ratedBy], references: [id])
+  receiver User @relation("RatingsReceived", fields: [ratedUser], references: [id])
+
+  @@map("ratings")
+}

@@ -1,15 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { useStore, MOCK_DRIVERS } from '@/lib/store';
+import { useState, useEffect } from 'react';
+import { useStore, apiGetNearbyDrivers, apiCreateTrip, FALLBACK_DRIVERS } from '@/lib/store';
 import type { Driver } from '@/lib/store';
 import { Glow, Card, Pill, Avatar } from '../Layout';
 
 export default function BookPage() {
-  const { destination, setDestination, setPage, setSelectedDriver } = useStore();
+  const { destination, setDestination, setPage, setSelectedDriver, setActiveTrip, token } = useStore();
   const [selected, setSelected] = useState<Driver | null>(null);
   const [rideType, setRideType] = useState<'economy' | 'comfort' | 'premium'>('economy');
   const [loading, setLoading] = useState(false);
+  const [drivers, setDrivers] = useState<Driver[]>(FALLBACK_DRIVERS);
+
+  useEffect(() => {
+    apiGetNearbyDrivers().then(setDrivers);
+  }, []);
 
   const rideTypes = [
     { id: 'economy', icon: '🚗', label: 'Ekonomik', mult: 1.0, desc: 'Uygun fiyat' },
@@ -22,10 +27,20 @@ export default function BookPage() {
   const handleBook = async () => {
     if (!selected) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setSelectedDriver(selected);
-    setLoading(false);
-    setPage('tracking');
+    try {
+      const mult = rideTypes.find(r => r.id === rideType)?.mult || 1;
+      const fare = Math.round(45 * mult + 15);
+      const trip = await apiCreateTrip(token, selected.id, 'Mevcut Konum', destination, fare);
+      setSelectedDriver(selected);
+      setActiveTrip(trip);
+      setPage('tracking');
+    } catch {
+      setSelectedDriver(selected);
+      setActiveTrip({ id: `demo-${Date.now()}`, status: 'REQUESTED', driverId: selected.id, startAddress: 'Mevcut Konum', endAddress: destination, demo: true });
+      setPage('tracking');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -84,7 +99,7 @@ export default function BookPage() {
         <div>
           <h3 style={{ color: '#fff', fontWeight: 800, fontSize: 15, marginBottom: 12 }}>Yakındaki Sürücüler</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {MOCK_DRIVERS.map(driver => {
+            {drivers.map((driver: Driver) => {
               const mult = rideTypes.find(r => r.id === rideType)?.mult || 1;
               const fare = getFare(mult);
               const isSelected = selected?.id === driver.id;
