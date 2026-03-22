@@ -1,0 +1,266 @@
+// This is your Prisma schema file
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// User & Authentication
+// ==========================================
+
+enum UserRole {
+  PASSENGER
+  DRIVER
+  FLEET_MANAGER
+  ADMIN
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  phone        String    @unique
+  passwordHash String    @map("password_hash")
+  role         UserRole  @default(PASSENGER)
+  firstName    String    @map("first_name")
+  lastName     String    @map("last_name")
+  avatarUrl    String?   @map("avatar_url")
+  isVerified   Boolean   @default(false) @map("is_verified")
+  isActive     Boolean   @default(true) @map("is_active")
+  preferences  Json?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  driver          Driver?
+  passengerTrips  Trip[]    @relation("PassengerTrips")
+  ratingsGiven    Rating[]  @relation("RatingsGiven")
+  ratingsReceived Rating[]  @relation("RatingsReceived")
+  ownedFleets     Fleet[]
+
+  @@map("users")
+}
+
+// ==========================================
+// Vehicle & Driver
+// ==========================================
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+model Vehicle {
+  id           String        @id @default(uuid())
+  fleetId      String?       @map("fleet_id")
+  plateNumber  String        @unique @map("plate_number")
+  brand        String
+  model        String
+  year         Int
+  deviceSerial String        @unique @map("device_serial")
+  status       VehicleStatus @default(ACTIVE)
+  deviceConfig Json?         @map("device_config")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  fleet     Fleet?     @relation(fields: [fleetId], references: [id])
+  driver    Driver?
+  trips     Trip[]
+  locations Location[]
+  videos    VideoRecording[]
+
+  @@map("vehicles")
+}
+
+enum DriverStatus {
+  ONLINE
+  OFFLINE
+  ON_TRIP
+  BREAK
+}
+
+model Driver {
+  id            String       @id @default(uuid())
+  userId        String       @unique @map("user_id")
+  vehicleId     String?      @unique @map("vehicle_id")
+  licenseNumber String       @map("license_number")
+  licenseExpiry DateTime     @map("license_expiry")
+  status        DriverStatus @default(OFFLINE)
+  rating        Float        @default(5.0)
+  totalTrips    Int          @default(0) @map("total_trips")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id])
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id])
+  trips   Trip[]
+
+  @@map("drivers")
+}
+
+// ==========================================
+// Trip & Rating
+// ==========================================
+
+enum TripStatus {
+  REQUESTED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Trip {
+  id            String     @id @default(uuid())
+  passengerId   String     @map("passenger_id")
+  driverId      String     @map("driver_id")
+  vehicleId     String     @map("vehicle_id")
+  startLat      Float      @map("start_lat")
+  startLng      Float      @map("start_lng")
+  endLat        Float?     @map("end_lat")
+  endLng        Float?     @map("end_lng")
+  startAddress  String     @map("start_address")
+  endAddress    String?    @map("end_address")
+  startedAt     DateTime   @default(now()) @map("started_at")
+  endedAt       DateTime?  @map("ended_at")
+  status        TripStatus @default(REQUESTED)
+  fare          Decimal?
+  shareLink     String?    @unique @map("share_link")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  // Relations
+  passenger  User             @relation("PassengerTrips", fields: [passengerId], references: [id])
+  driver     Driver           @relation(fields: [driverId], references: [id])
+  vehicle    Vehicle          @relation(fields: [vehicleId], references: [id])
+  locations  Location[]
+  recordings VideoRecording[]
+  ratings    Rating[]
+
+  @@map("trips")
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  tripId    String   @map("trip_id")
+  ratedBy   String   @map("rated_by")
+  ratedUser String   @map("rated_user")
+  score     Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  trip     Trip @relation(fields: [tripId], references: [id])
+  rater    User @relation("RatingsGiven", fields: [ratedBy], references: [id])
+  receiver User @relation("RatingsReceived", fields: [ratedUser], references: [id])
+
+  @@map("ratings")
+}
+
+// ==========================================
+// Location Tracking (TimescaleDB hypertable)
+// ==========================================
+
+model Location {
+  id         BigInt   @id @default(autoincrement())
+  vehicleId  String   @map("vehicle_id")
+  tripId     String?  @map("trip_id")
+  latitude   Float
+  longitude  Float
+  speed      Float    @default(0)
+  heading    Float    @default(0)
+  altitude   Float?
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  // Relations
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  trip    Trip?   @relation(fields: [tripId], references: [id])
+
+  @@index([vehicleId, recordedAt])
+  @@index([tripId])
+  @@map("locations")
+}
+
+// ==========================================
+// Video Recording
+// ==========================================
+
+enum RecordingStatus {
+  RECORDING
+  UPLOADED
+  ARCHIVED
+  DELETED
+}
+
+model VideoRecording {
+  id              String          @id @default(uuid())
+  vehicleId       String          @map("vehicle_id")
+  tripId          String?         @map("trip_id")
+  storageUrl      String          @map("storage_url")
+  durationSeconds Int             @default(0) @map("duration_seconds")
+  fileSize        BigInt          @default(0) @map("file_size")
+  status          RecordingStatus @default(RECORDING)
+  startedAt       DateTime        @default(now()) @map("started_at")
+  endedAt         DateTime?       @map("ended_at")
+  expiresAt       DateTime        @map("expires_at")
+
+  // Relations
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  trip    Trip?   @relation(fields: [tripId], references: [id])
+
+  @@index([vehicleId])
+  @@index([tripId])
+  @@map("video_recordings")
+}
+
+// ==========================================
+// Fleet & Geofence
+// ==========================================
+
+enum FleetPlan {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+model Fleet {
+  id           String    @id @default(uuid())
+  ownerId      String    @map("owner_id")
+  name         String
+  taxNumber    String?   @map("tax_number")
+  vehicleCount Int       @default(0) @map("vehicle_count")
+  plan         FleetPlan @default(BASIC)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  owner     User       @relation(fields: [ownerId], references: [id])
+  vehicles  Vehicle[]
+  geofences Geofence[]
+
+  @@map("fleets")
+}
+
+enum GeofenceType {
+  RESTRICTED
+  ALERT
+  OPERATIONAL
+}
+
+model Geofence {
+  id       String       @id @default(uuid())
+  fleetId  String       @map("fleet_id")
+  name     String
+  // Boundary stored as JSON array of {lat, lng} points
+  boundary Json
+  type     GeofenceType @default(ALERT)
+  isActive Boolean      @default(true) @map("is_active")
+
+  // Relations
+  fleet Fleet @relation(fields: [fleetId], references: [id])
+
+  @@map("geofences")
+}

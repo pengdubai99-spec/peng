@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -338,7 +338,7 @@
   // STATE
   // ==========================================
   let socket = null;
-  let livekitRoom = null;
+  let peerConnection = null;
   let viewerId = 'viewer-' + Math.random().toString(36).substr(2, 9);
   let currentVehicleId = null;
   let map = null;
@@ -467,6 +467,40 @@
         updateMap(lat, lng, data.speed || 0, data.heading || 0);
       }
     });
+
+    // WebRTC: Handle incoming Offer from Streamer (Driver App)
+    socket.on('webrtc:offer', async (data) => {
+      if (data.viewerId !== viewerId) return;
+      addLog('Streamer\'dan Offer alındı. Answer oluşturuluyor...');
+      
+      try {
+        if (!peerConnection) initPeerConnection();
+        
+        await peerConnection.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: data.sdp }));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        
+        addLog('Answer gönderiliyor...');
+        socket.emit('webrtc:answer', {
+          vehicleId: currentVehicleId,
+          viewerId: viewerId,
+          sdp: answer.sdp
+        });
+      } catch (err) {
+        addLog('Offer işlenirken hata: ' + err.message);
+      }
+    });
+
+    // WebRTC: Handle incoming ICE Candidate from Streamer
+    socket.on('webrtc:ice-candidate', async (data) => {
+      if (data.viewerId !== viewerId || !peerConnection) return;
+      try {
+        await peerConnection.addIceCandidate(data.candidate);
+        addLog('Uzak ICE adayı eklendi');
+      } catch (err) {
+        addLog('ICE adayı eklenirken hata: ' + err.message);
+      }
+    });
   }
 
   // ==========================================
@@ -492,14 +526,68 @@
   }
 
   // ==========================================
-  // LiveKit: CONNECT TO ROOM
+  // P2P: REQUEST STREAM & PEER CONNECTION
   // ==========================================
+  
+  function initPeerConnection() {
+    if (peerConnection) {
+      peerConnection.close();
+    }
+    
+    // Use Google STUN Servers
+    const configuration = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    };
+    
+    peerConnection = new RTCPeerConnection(configuration);
+    
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        // Send our ICE candidate to the streamer
+        socket.emit('webrtc:ice-candidate', {
+          vehicleId: currentVehicleId,
+          viewerId: viewerId,
+          candidate: event.candidate
+        });
+      }
+    };
+    
+    peerConnection.ontrack = (event) => {
+      addLog('Uzak video track alındı');
+      if (remoteVideo.srcObject !== event.streams[0]) {
+        remoteVideo.srcObject = event.streams[0];
+        remoteVideo.style.display = 'block';
+        videoPlaceholder.style.display = 'none';
+        liveBadge.style.display = 'flex';
+        
+        remoteVideo.onloadeddata = () => {
+          document.getElementById('resolutionInfo').textContent = `${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`;
+          remoteVideo.play().then(() => {
+            addLog('Video başarıyla oynatılıyor');
+          }).catch(err => {
+            addLog('Otomatik oynatma başarısız: ' + err.message);
+          });
+        };
+      }
+    };
+    
+    peerConnection.onconnectionstatechange = () => {
+      addLog('P2P Durumu: ' + peerConnection.connectionState);
+      if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
+        stopWatching();
+      }
+    };
+  }
+
   async function requestStream() {
     const vehicleId = vehicleInput.value.trim();
     if (!vehicleId) return;
 
-    // Cleanup previous
-    if (livekitRoom) stopWatching();
+    // Cleanup previous connection
+    if (peerConnection) stopWatching();
 
     currentVehicleId = vehicleId;
     addLog(`Yayın isteği gönderiliyor: ${vehicleId}`);
@@ -508,84 +596,15 @@
     socket.emit('location:subscribe', { vehicleId });
 
     try {
-      // 1. Fetch token from our Node.js Backend
-      addLog('LiveKit yetki bileti (token) alınıyor...');
-      const response = await fetch(`/livekit/token?room=${currentVehicleId}&participant=${viewerId}&role=subscriber`);
-      if (!response.ok) {
-        throw new Error(`Token alınamadı: ${response.statusText}`);
-      }
+      // 1. Initialize PeerConnection
+      initPeerConnection();
       
-      const { token } = await response.json();
-      
-      // 2. Initialize LiveKit Room
-      livekitRoom = new LivekitClient.Room();
-
-      livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-        addLog(`Kanal yakalandı: ${track.kind} | Etkin: ${!track.isMuted}`);
-        
-        if (track.kind === LivekitClient.Track.Kind.Video) {
-          // Attach track to our remoteVideo element
-          const attachedEl = track.attach(remoteVideo);
-          addLog('Video track bağlandı, veri bekleniyor...');
-          
-          // Show video element immediately
-          remoteVideo.style.display = 'block';
-          videoPlaceholder.style.display = 'none';
-          liveBadge.style.display = 'flex';
-
-          // Wait for video data to be ready before playing
-          remoteVideo.onloadeddata = () => {
-            addLog(`Video verisi hazır: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
-            document.getElementById('resolutionInfo').textContent = `${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`;
-            
-            // Now safe to play
-            remoteVideo.play().then(() => {
-              addLog('Video oynatılıyor ✅');
-            }).catch(error => {
-              addLog('Otomatik oynatma engellendi: ' + error.message);
-              console.warn('Autoplay prevented:', error);
-              
-              // Show click-to-play overlay ON TOP of video, don't hide video
-              videoPlaceholder.style.display = 'flex';
-              videoPlaceholder.style.position = 'absolute';
-              videoPlaceholder.style.top = '0';
-              videoPlaceholder.style.left = '0';
-              videoPlaceholder.style.right = '0';
-              videoPlaceholder.style.bottom = '0';
-              videoPlaceholder.style.background = 'rgba(0,0,0,0.7)';
-              videoPlaceholder.style.cursor = 'pointer';
-              videoPlaceholder.style.zIndex = '5';
-              videoPlaceholder.innerHTML = '<span style="font-size:48px;">▶</span><span style="font-size:14px;font-weight:600;color:#fff;">Yayını Başlatmak İçin Tıklayın</span>';
-              
-              videoPlaceholder.onclick = () => {
-                remoteVideo.play();
-                videoPlaceholder.style.display = 'none';
-                addLog('Oynatma manuel tetiklendi ✅');
-              };
-            });
-          };
-
-          remoteVideo.onloadedmetadata = () => {
-            addLog(`Yayın Özellikleri: ${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
-          };
-
-          addLog('Video ekrana başarılı şekilde bağlandı');
-        }
+      // 2. Request stream from driver app (which will trigger an offer)
+      addLog('Araçtan stream talep ediliyor...');
+      socket.emit('webrtc:request-stream', {
+        vehicleId: currentVehicleId,
+        viewerId: viewerId
       });
-
-      livekitRoom.on(LivekitClient.RoomEvent.Disconnected, () => {
-        addLog('LiveKit: Bağlantı koptu');
-        stopWatching();
-      });
-
-      // 3. Connect to the LiveKit Server using the Token
-      addLog('LiveKit sunucusuna bağlanılıyor...');
-      const LIVEKIT_URL = 'wss://peng-cantak-3avcr64w.livekit.cloud';
-      await livekitRoom.connect(LIVEKIT_URL, token, {
-        autoSubscribe: true, // Automatically subscribe to tracks published by the vehicle
-      });
-
-      addLog('LiveKit: Odaya başarıyla bağlanıldı!');
 
       watchBtn.style.display = 'none';
       stopBtn.style.display = 'inline-block';
@@ -601,9 +620,9 @@
   // STOP WATCHING
   // ==========================================
   function stopWatching() {
-    if (livekitRoom) {
-      livekitRoom.disconnect();
-      livekitRoom = null;
+    if (peerConnection) {
+      peerConnection.close();
+      peerConnection = null;
     }
 
     remoteVideo.srcObject = null;

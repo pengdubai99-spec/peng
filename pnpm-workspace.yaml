@@ -2,5 +2,7 @@ packages:
   - "apps/dashboard"
   - "apps/passenger-web"
   - "apps/admin"
+  - "apps/mobile"
+  - "apps/customer"
   - "services/*"
   - "packages/*"

@@ -67,9 +67,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
   ) {
     const { vehicleId, position, speed } = data;
-    const lat = (position as any).lat ?? position.latitude;
-    const lng = (position as any).lng ?? position.longitude;
-    console.log(`🛰️  [GPS] Vehicle: ${vehicleId} | Lat: ${lat?.toFixed(4)} Lng: ${lng?.toFixed(4)} | Speed: ${speed} km/h`);
+    console.log(`🛰️  [GPS] Vehicle: ${vehicleId} | Lat: ${position.latitude?.toFixed(4)} Lng: ${position.longitude?.toFixed(4)} | Speed: ${speed} km/h`);
 
     // Broadcast to subscribers of this vehicle/trip + global fleet
     this.server.to(`vehicle:${vehicleId}`).emit(SocketEvents.LOCATION_DATA, data);
@@ -143,5 +141,67 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     client.emit(SocketEvents.WEBRTC_STREAM_LIST, {
       activeStreams: Array.from(this.activeStreamers.keys()),
     });
+  }
+
+  // ==========================================
+  // WebRTC Signaling Relay
+  // ==========================================
+
+  @SubscribeMessage(SocketEvents.WEBRTC_REQUEST_STREAM)
+  handleRequestStream(
+    @MessageBody() data: { vehicleId: string; viewerId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    // Viewer -> Streamer
+    const streamerSocketId = this.activeStreamers.get(data.vehicleId);
+    if (streamerSocketId) {
+      console.log(`[WebRTC] Relay request-stream from viewer ${data.viewerId} to vehicle ${data.vehicleId}`);
+      this.server.to(streamerSocketId).emit(SocketEvents.WEBRTC_REQUEST_STREAM, data);
+    } else {
+      console.log(`[WebRTC] Failed to request-stream: vehicle ${data.vehicleId} is not streaming.`);
+    }
+  }
+
+  @SubscribeMessage(SocketEvents.WEBRTC_OFFER)
+  handleWebRTCOffer(
+    @MessageBody() data: WebRTCOffer,
+    @ConnectedSocket() client: Socket,
+  ) {
+    // Streamer -> Viewer
+    console.log(`[WebRTC] Relay offer from vehicle ${data.vehicleId} to viewer ${data.viewerId}`);
+    this.server.to(data.viewerId).emit(SocketEvents.WEBRTC_OFFER, data);
+  }
+
+  @SubscribeMessage(SocketEvents.WEBRTC_ANSWER)
+  handleWebRTCAnswer(
+    @MessageBody() data: WebRTCAnswer,
+    @ConnectedSocket() client: Socket,
+  ) {
+    // Viewer -> Streamer
+    const streamerSocketId = this.activeStreamers.get(data.vehicleId);
+    if (streamerSocketId) {
+      console.log(`[WebRTC] Relay answer from viewer ${data.viewerId} to vehicle ${data.vehicleId}`);
+      this.server.to(streamerSocketId).emit(SocketEvents.WEBRTC_ANSWER, data);
+    }
+  }
+
+  @SubscribeMessage(SocketEvents.WEBRTC_ICE_CANDIDATE)
+  handleIceCandidate(
+    @MessageBody() data: WebRTCIceCandidate,
+    @ConnectedSocket() client: Socket,
+  ) {
+    // Bidirectional Relay
+    const streamerSocketId = this.activeStreamers.get(data.vehicleId);
+    const isFromViewer = client.id !== streamerSocketId;
+
+    if (isFromViewer) {
+      // Viewer -> Streamer
+      if (streamerSocketId) {
+        this.server.to(streamerSocketId).emit(SocketEvents.WEBRTC_ICE_CANDIDATE, data);
+      }
+    } else {
+      // Streamer -> Viewer
+      this.server.to(data.viewerId).emit(SocketEvents.WEBRTC_ICE_CANDIDATE, data);
+    }
   }
 }

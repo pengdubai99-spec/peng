@@ -14,7 +14,8 @@
   "devDependencies": {
     "turbo": "^2.4.0",
     "prettier": "^3.5.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "@expo/config-plugins": "^9.0.0"
   },
   "engines": {
     "node": ">=20"

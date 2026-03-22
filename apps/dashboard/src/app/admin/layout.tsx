@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AdminSidebar from "../../components/admin/AdminSidebar";
+import PengAssistant from "../../components/assistant/PengAssistant";
 import { Language } from "../../lib/i18n";
 import { LangContext } from "../../lib/admin-context";
 
@@ -29,6 +30,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           {children}
         </main>
+        <PengAssistant />
       </div>
     </LangContext>
   );

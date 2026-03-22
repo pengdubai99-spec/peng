@@ -399,8 +399,17 @@ function HomeScreen() {
               top: '50%', left: '50%',
               marginLeft: -60, marginTop: -60,
             }} />
-            {/* Konum pin */}
-            <View style={{ alignItems: 'center' }}>
+            {/* Konum pin - Dynamic Mock */}
+            <View style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: [
+                { translateX: userLocation ? (userLocation.longitude % 0.01) * 20000 - 100 : 0 },
+                { translateY: userLocation ? (userLocation.latitude % 0.01) * -20000 + 100 : 0 }
+              ],
+              alignItems: 'center',
+            }}>
               <View style={{
                 width: 56, height: 56, borderRadius: 28,
                 backgroundColor: C.purple,
@@ -427,7 +436,9 @@ function HomeScreen() {
                 backgroundColor: C.card, borderRadius: 8,
                 padding: 6, borderWidth: 1, borderColor: C.border,
               }}>
-                <Text style={{ color: C.success, fontSize: 10, fontWeight: '700' }}>● Konum Alındı</Text>
+                <Text style={{ color: C.success, fontSize: 10, fontWeight: '700' }}>
+                  {`● Konum: ${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}`}
+                </Text>
               </View>
             )}
           </View>
