@@ -8,13 +8,13 @@ export default function ProfilePage() {
   const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'U';
 
   const menuItems = [
-    { icon: '👤', label: 'Hesap Bilgileri' },
-    { icon: '💳', label: 'Ödeme Yöntemleri' },
-    { icon: '🔔', label: 'Bildirimler' },
-    { icon: '🛡️', label: 'Gizlilik & Güvenlik' },
-    { icon: '🌍', label: 'Dil Ayarları' },
-    { icon: '❓', label: 'Yardım & Destek' },
-    { icon: '⭐', label: 'Uygulamayı Değerlendir' },
+    { icon: '👤', label: 'Hesap Bilgileri', action: () => alert('Hesap bilgileri yakında kullanılabilecek.') },
+    { icon: '💳', label: 'Ödeme Yöntemleri', action: () => alert('Ödeme yöntemleri yakında kullanılabilecek.') },
+    { icon: '🔔', label: 'Bildirimler', action: () => alert('Bildirim ayarları yakında kullanılabilecek.') },
+    { icon: '🛡️', label: 'Gizlilik & Güvenlik', action: () => alert('Gizlilik ayarları yakında kullanılabilecek.') },
+    { icon: '🌍', label: 'Dil Ayarları', action: () => alert('Dil ayarları yakında kullanılabilecek.') },
+    { icon: '❓', label: 'Yardım & Destek', action: () => window.open('mailto:support@peng.ae', '_blank') },
+    { icon: '⭐', label: 'Uygulamayı Değerlendir', action: () => alert('Değerlendirmeniz için teşekkürler! ⭐') },
   ];
 
   return (
@@ -66,7 +66,7 @@ export default function ProfilePage() {
         {/* Menü */}
         <Card style={{ marginBottom: 16 }}>
           {menuItems.map((item, i) => (
-            <button key={i} style={{
+            <button key={i} onClick={item.action} style={{
               display: 'flex', alignItems: 'center', gap: 14,
               padding: '16px 18px', width: '100%',
               background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
