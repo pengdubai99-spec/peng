@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTripDto } from './dto/create-trip.dto';
-import { TripStatus } from '@saferide/database';
+import { TripStatus } from '@prisma/client';
 
 @Injectable()
 export class TripsService {
